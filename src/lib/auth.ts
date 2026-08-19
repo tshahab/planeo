@@ -1,4 +1,4 @@
-import { createHmac, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "./db";
 
@@ -33,6 +33,12 @@ export function verifyPassword(password: string, stored: string) {
   const expected = Buffer.from(hashHex, "hex");
   const actual = scryptSync(password, Buffer.from(saltHex, "hex"), expected.length);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+export function hashPassword(password: string) {
+  const salt = randomBytes(16);
+  const hash = scryptSync(password, salt, 64);
+  return `scrypt$${salt.toString("hex")}$${hash.toString("hex")}`;
 }
 
 export async function createSession(userId: string, workspaceId: string) {
