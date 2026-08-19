@@ -1,0 +1,165 @@
+"use client";
+
+import {
+  Bell, ChevronDown, CircleHelp, FolderKanban, Inbox, LayoutDashboard,
+  ListFilter, Menu, MoreHorizontal, Plus, Search, Settings, Sparkles, Users, X,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Board } from "./board";
+import { CreateIssue } from "./create-issue";
+import { CreateProject } from "./create-project";
+import { ProjectMembers } from "./project-members";
+import { IssuePanel } from "./issue-panel";
+import { people } from "@/lib/demo-data";
+import type { Issue, Person, ProjectSummary, Status } from "@/lib/types";
+
+export function WorkspaceApp({ currentUser, workspaceName, project, projects, canManageProjects, canManageProject, canWriteProject }: { currentUser: Person; workspaceName: string; project: ProjectSummary; projects: ProjectSummary[]; canManageProjects: boolean; canManageProject: boolean; canWriteProject: boolean }) {
+  const router = useRouter();
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [managingMembers, setManagingMembers] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"All" | "Mine">("All");
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/issues?projectKey=${encodeURIComponent(project.key)}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load issues from the database.");
+        return response.json() as Promise<{ issues: Issue[] }>;
+      })
+      .then(({ issues: persistedIssues }) => setIssues(persistedIssues))
+      .catch((error: Error) => {
+        if (error.name !== "AbortError") setSyncError(error.message);
+      });
+    return () => controller.abort();
+  }, [project.key]);
+
+  const visibleIssues = useMemo(() => issues.filter((issue) => {
+    const matchesQuery = `${issue.key} ${issue.title} ${issue.labels.join(" ")}`.toLowerCase().includes(query.toLowerCase());
+    const matchesOwner = filter === "All" || issue.assignee?.id === currentUser.id;
+    return matchesQuery && matchesOwner;
+  }), [issues, query, filter, currentUser.id]);
+
+  async function moveIssue(id: string, status: Status) {
+    const previous = issues.find((issue) => issue.id === id);
+    setIssues((current) => current.map((issue) => issue.id === id ? { ...issue, status } : issue));
+    setSelectedIssue((current) => current?.id === id ? { ...current, status } : current);
+    setSyncError(null);
+    try {
+      const response = await fetch(`/api/issues/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+      if (!response.ok) throw new Error("The status change could not be saved.");
+      const { issue } = await response.json() as { issue: Issue };
+      setIssues((current) => current.map((item) => item.id === id ? issue : item));
+      setSelectedIssue((current) => current?.id === id ? issue : current);
+    } catch (error) {
+      if (previous) {
+        setIssues((current) => current.map((item) => item.id === id ? previous : item));
+        setSelectedIssue((current) => current?.id === id ? previous : current);
+      }
+      setSyncError(error instanceof Error ? error.message : "The status change could not be saved.");
+    }
+  }
+
+  async function updateIssue(id: string, changes: Record<string, unknown>) {
+    const response = await fetch(`/api/issues/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(changes) });
+    const result = await response.json() as { issue?: Issue; error?: string };
+    if (!response.ok || !result.issue) throw new Error(result.error ?? "The issue changes could not be saved.");
+    setIssues((current) => current.map((item) => item.id === id ? result.issue! : item));
+    setSelectedIssue((current) => current?.id === id ? result.issue! : current);
+  }
+
+  async function addIssue(draft: Issue) {
+    setSyncError(null);
+    try {
+      const response = await fetch("/api/issues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectKey: project.key, title: draft.title, description: draft.description, priority: draft.priority, assigneeId: draft.assignee?.id }),
+      });
+      const result = await response.json() as { issue?: Issue; error?: string };
+      if (!response.ok || !result.issue) throw new Error(result.error ?? "The issue could not be created.");
+      setIssues((current) => [result.issue!, ...current]);
+      setCreating(false);
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : "The issue could not be created.");
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+        <div className="workspace-switcher">
+          <div className="brand-mark">P</div>
+          <div><strong>{workspaceName}</strong><span>Product workspace</span></div>
+          <ChevronDown size={15} />
+          <button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={18} /></button>
+        </div>
+
+        {canWriteProject && <button className="create-button" onClick={() => setCreating(true)}><Plus size={17} /> Create issue <kbd>C</kbd></button>}
+
+        <nav aria-label="Main navigation">
+          <a href="#" className="nav-item"><LayoutDashboard /> Home</a>
+          <a href="#" className="nav-item"><Inbox /> Your work <span className="nav-count">5</span></a>
+          <a href="#" className="nav-item"><Search /> Search</a>
+          <a href="#" className="nav-item"><Bell /> Notifications <span className="notification-dot" /></a>
+        </nav>
+
+        <div className="nav-section">
+          <div className="nav-heading"><span>Projects</span>{canManageProjects && <button onClick={() => setCreatingProject(true)} aria-label="Create project"><Plus size={14} /></button>}</div>
+          {projects.map((item, index) => <Link href={`/projects/${item.key}`} key={item.id} className={`project-item ${item.id === project.id ? "active" : ""}`}><span className={`project-icon ${["purple", "green", "orange"][index % 3]}`}>{item.name[0]}</span><span>{item.name}<small>{item.key}</small></span>{item.id === project.id && <MoreHorizontal size={15} />}</Link>)}
+        </div>
+
+        <div className="sidebar-footer">
+          <a href="#" className="nav-item"><Users /> Invite people</a>
+          <a href="#" className="nav-item"><CircleHelp /> Help & feedback</a>
+          <a href="#" className="nav-item"><Settings /> Settings</a>
+          <div className="user-card"><Avatar person={currentUser} /><div><strong>{currentUser.name}</strong><span>Signed in</span></div><button className="logout-button" aria-label="Sign out" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.replace("/login"); router.refresh(); }}><MoreHorizontal size={16} /></button></div>
+        </div>
+      </aside>
+      {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
+
+      <main className="main-content">
+        <header className="topbar">
+          <button className="menu-button" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
+          <div className="breadcrumbs"><span>Projects</span><span>/</span><strong>{project.name}</strong></div>
+          <div className="top-actions"><button className="icon-button" aria-label="Notifications"><Bell size={18} /><i /></button><Avatar person={currentUser} /></div>
+        </header>
+
+        <section className="project-header">
+          <div className="project-title-row">
+            <div><span className="eyebrow">{project.key} PROJECT</span><h1>{project.name}</h1><p>{project.description || "Plan and deliver your team's work."}</p></div>
+            <div className="header-actions"><div className="avatar-stack">{people.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}<span className="more-people">+3</span></div>{canManageProject && <button className="secondary-button" onClick={() => setManagingMembers(true)}><Settings size={16} /> Project settings</button>}{canWriteProject && <button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Create</button>}</div>
+          </div>
+          <div className="tabs" role="tablist"><button>Summary</button><button className="active">Board</button><button>Backlog</button><button>Issues</button></div>
+        </section>
+
+        <section className="board-toolbar">
+          <div className="search-box"><Search size={17} /><input aria-label="Search this board" placeholder="Search this board" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <button onClick={() => setQuery("")} aria-label="Clear search"><X size={14} /></button>}</div>
+          <button className={`filter-button ${filter === "Mine" ? "filter-active" : ""}`} onClick={() => setFilter((value) => value === "All" ? "Mine" : "All")}><ListFilter size={16} /> {filter === "Mine" ? "Assigned to me" : "Filter"}</button>
+          <div className="toolbar-divider" />
+          <button className="view-button"><FolderKanban size={16} /> Board <ChevronDown size={14} /></button>
+          {project.template === "SCRUM" && <div className="sprint-chip"><Sparkles size={14} /><span>Sprint 8</span><strong>6 days left</strong></div>}
+        </section>
+
+        <Board issues={visibleIssues} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={() => setCreating(true)} readOnly={!canWriteProject} />
+      </main>
+
+      {selectedIssue && <IssuePanel issue={selectedIssue} onClose={() => setSelectedIssue(null)} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} readOnly={!canWriteProject} />}
+      {creating && <CreateIssue people={people} nextNumber={issues.length + 1} onClose={() => setCreating(false)} onCreate={addIssue} />}
+      {creatingProject && <CreateProject onClose={() => setCreatingProject(false)} />}
+      {managingMembers && <ProjectMembers projectKey={project.key} projectName={project.name} onClose={() => setManagingMembers(false)} />}
+      {syncError && <div className="sync-error" role="alert"><span>{syncError}</span><button onClick={() => setSyncError(null)} aria-label="Dismiss error"><X size={15} /></button></div>}
+    </div>
+  );
+}
+
+export function Avatar({ person }: { person: { name: string; initials: string; color: string } }) {
+  return <span className="avatar" style={{ background: person.color }} title={person.name}>{person.initials}</span>;
+}

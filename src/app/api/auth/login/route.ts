@@ -1,0 +1,17 @@
+import { NextResponse } from "next/server";
+import { createSession, verifyPassword } from "@/lib/auth";
+import { db } from "@/lib/db";
+
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => null) as { email?: unknown; password?: unknown } | null;
+  if (typeof body?.email !== "string" || typeof body.password !== "string") {
+    return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+  }
+  const email = body.email.trim().toLowerCase();
+  const user = await db.user.findUnique({ where: { email }, include: { memberships: { orderBy: { joinedAt: "asc" }, take: 1 } } });
+  if (!user?.passwordHash || !verifyPassword(body.password, user.passwordHash) || !user.memberships[0]) {
+    return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
+  }
+  await createSession(user.id, user.memberships[0].workspaceId);
+  return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } });
+}

@@ -1,0 +1,10 @@
+.git
+.next
+node_modules
+.pnpm-store
+coverage
+.env
+.env.local
+*.log
+*.tsbuildinfo
+.DS_Store
