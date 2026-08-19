@@ -42,3 +42,7 @@ docker compose down
 ```
 
 Use `docker compose down -v` only when intentionally deleting the development database and all container-managed dependency volumes.
+
+## Continuous integration
+
+Every pull request and push to `main` runs a Docker-only verification build in GitHub Actions. The builder target validates the Prisma schema, runs ESLint, type-checks the application, and produces an optimized Next.js production build. The CI workflow installs no project packages directly on the runner host.

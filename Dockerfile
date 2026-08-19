@@ -23,6 +23,9 @@ CMD ["sh", "-c", "pnpm db:deploy && pnpm db:seed && pnpm dev --hostname 0.0.0.0"
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm exec prisma validate
+RUN pnpm exec eslint src
+RUN pnpm exec tsc --noEmit
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm build
 
 FROM node:22-alpine AS production
