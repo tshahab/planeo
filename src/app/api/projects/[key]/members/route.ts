@@ -53,13 +53,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
   }
 
   const existing = await db.workspaceInvitation.findFirst({ where: { workspaceId: context.workspace.id, projectId: project.id, email, status: "PENDING" } });
-  const tokenHash = createHash("sha256").update(randomBytes(32)).digest("hex");
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const invitation = existing
     ? await db.workspaceInvitation.update({ where: { id: existing.id }, data: { projectRole: role, tokenHash, expiresAt } })
     : await db.workspaceInvitation.create({ data: { workspaceId: context.workspace.id, projectId: project.id, email, projectRole: role, tokenHash, invitedById: context.user.id, expiresAt } });
   await db.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "project.invitation_created", targetType: "invitation", targetId: invitation.id, metadata: { projectId: project.id, email, role } } });
-  return NextResponse.json({ invitation: { id: invitation.id, email, projectRole: role, expiresAt } }, { status: 202 });
+  return NextResponse.json({ invitation: { id: invitation.id, email, projectRole: role, expiresAt, acceptPath: `/invitations/${token}` } }, { status: 202 });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ key: string }> }) {
