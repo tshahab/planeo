@@ -1,0 +1,11 @@
+ALTER TABLE "Sprint"
+ADD COLUMN "completedAt" TIMESTAMP(3),
+ADD COLUMN "totalIssueCount" INTEGER,
+ADD COLUMN "completedIssueCount" INTEGER,
+ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE "SprintIssue"
+ADD COLUMN "position" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "addedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE INDEX "SprintIssue_sprintId_position_idx" ON "SprintIssue"("sprintId", "position");

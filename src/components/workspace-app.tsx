@@ -12,6 +12,7 @@ import { CreateIssue } from "./create-issue";
 import { CreateProject } from "./create-project";
 import { ProjectMembers } from "./project-members";
 import { IssuePanel } from "./issue-panel";
+import { Backlog } from "./backlog";
 import { people } from "@/lib/demo-data";
 import type { Issue, Person, ProjectSummary, Status } from "@/lib/types";
 
@@ -26,6 +27,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, ca
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"All" | "Mine">("All");
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [view, setView] = useState<"board" | "backlog">("board");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -137,10 +139,10 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, ca
             <div><span className="eyebrow">{project.key} PROJECT</span><h1>{project.name}</h1><p>{project.description || "Plan and deliver your team's work."}</p></div>
             <div className="header-actions"><div className="avatar-stack">{people.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}<span className="more-people">+3</span></div>{canManageProject && <button className="secondary-button" onClick={() => setManagingMembers(true)}><Settings size={16} /> Project settings</button>}{canWriteProject && <button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Create</button>}</div>
           </div>
-          <div className="tabs" role="tablist"><button>Summary</button><button className="active">Board</button><button>Backlog</button><button>Issues</button></div>
+          <div className="tabs" role="tablist"><button>Summary</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><button>Issues</button></div>
         </section>
 
-        <section className="board-toolbar">
+        {view === "board" && <><section className="board-toolbar">
           <div className="search-box"><Search size={17} /><input aria-label="Search this board" placeholder="Search this board" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <button onClick={() => setQuery("")} aria-label="Clear search"><X size={14} /></button>}</div>
           <button className={`filter-button ${filter === "Mine" ? "filter-active" : ""}`} onClick={() => setFilter((value) => value === "All" ? "Mine" : "All")}><ListFilter size={16} /> {filter === "Mine" ? "Assigned to me" : "Filter"}</button>
           <div className="toolbar-divider" />
@@ -148,7 +150,8 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, ca
           {project.template === "SCRUM" && <div className="sprint-chip"><Sparkles size={14} /><span>Sprint 8</span><strong>6 days left</strong></div>}
         </section>
 
-        <Board issues={visibleIssues} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={() => setCreating(true)} readOnly={!canWriteProject} />
+        <Board issues={visibleIssues} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={() => setCreating(true)} readOnly={!canWriteProject} /></>}
+        {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={setSelectedIssue} />}
       </main>
 
       {selectedIssue && <IssuePanel issue={selectedIssue} onClose={() => setSelectedIssue(null)} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} readOnly={!canWriteProject} />}
