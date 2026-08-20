@@ -18,7 +18,7 @@ FROM base AS development
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm db:deploy && pnpm db:seed && pnpm dev --hostname 0.0.0.0"]
+CMD ["sh", "-c", "pnpm db:generate && pnpm db:deploy && pnpm db:seed && pnpm dev --hostname 0.0.0.0"]
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules

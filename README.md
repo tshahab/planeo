@@ -10,6 +10,7 @@ This product, including its requirements, design, implementation, tests, and doc
 - [Feature catalogue](docs/features.md)
 - [Product and technical design](docs/design.md)
 - [Delivery roadmap](docs/roadmap.md)
+- [Security and production operations](docs/security-operations.md)
 
 ## Initial product direction
 
