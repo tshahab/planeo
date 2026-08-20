@@ -20,6 +20,7 @@ export interface AuthContext {
 function secret() {
   const value = process.env.SESSION_SECRET;
   if (!value || value.length < 32) throw new Error("SESSION_SECRET must contain at least 32 characters");
+  if (process.env.NODE_ENV === "production" && value === "docker-development-secret-change-before-production") throw new Error("The development SESSION_SECRET cannot be used in production");
   return value;
 }
 

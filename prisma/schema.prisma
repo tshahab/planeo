@@ -299,6 +299,14 @@ model IssueLink {
   @@index([inwardIssueId])
 }
 
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(1)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+  @@index([resetAt])
+}
+
 model Board {
   id        String @id @default(cuid())
   projectId String
