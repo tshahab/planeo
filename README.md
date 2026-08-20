@@ -27,7 +27,7 @@ docker compose up --build
 
 Open `http://localhost:3000` after the application starts.
 
-On first start, the app automatically applies committed migrations and seeds an idempotent Planeo demo workspace. Issue creation and status changes are persisted in the Docker-managed PostgreSQL volume.
+On first start, the app automatically applies committed migrations and seeds an idempotent Planeo demo workspace. Issue creation, status changes, backlog ordering, and sprint lifecycle history are persisted in the Docker-managed PostgreSQL volume.
 
 Sign in with any seeded account—`mina@planeo.co`, `sam@planeo.co`, `alex@planeo.co`, or `noor@planeo.co`—using the development password `planeo-demo`. Replace the Docker development `SESSION_SECRET` and remove demo credentials before any public deployment.
 

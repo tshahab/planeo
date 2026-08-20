@@ -34,3 +34,16 @@ export interface ProjectSummary {
   template: "KANBAN" | "SCRUM";
   visibility: "PUBLIC" | "PRIVATE";
 }
+
+export interface SprintSummary {
+  id: string;
+  name: string;
+  goal?: string;
+  state: "PLANNED" | "ACTIVE" | "COMPLETED";
+  startsAt?: string;
+  endsAt?: string;
+  completedAt?: string;
+  totalIssueCount?: number;
+  completedIssueCount?: number;
+  issues: Issue[];
+}
