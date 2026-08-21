@@ -1,23 +1,22 @@
 "use client";
 
 import { AlertCircle, Bug, CheckSquare2, ChevronDown, MessageSquare, MoreHorizontal, Paperclip, Plus, Zap } from "lucide-react";
-import { columns } from "@/lib/demo-data";
-import type { Issue, Priority, Status } from "@/lib/types";
+import type { Issue, Priority, ProjectStatus, Status } from "@/lib/types";
 import { Avatar } from "./workspace-app";
 
 const priorityIcon: Record<Priority, React.ReactNode> = {
   Urgent: <AlertCircle size={14} />, High: <Zap size={14} />, Medium: <span className="priority-bars">≡</span>, Low: <ChevronDown size={14} />,
 };
 
-export function Board({ issues, onSelect, onMove, onCreate, readOnly = false }: { issues: Issue[]; onSelect: (issue: Issue) => void; onMove: (id: string, status: Status) => void; onCreate: () => void; readOnly?: boolean }) {
+export function Board({ issues, statuses, onSelect, onMove, onCreate, readOnly = false }: { issues: Issue[]; statuses: ProjectStatus[]; onSelect: (issue: Issue) => void; onMove: (id: string, status: Status) => void; onCreate: () => void; readOnly?: boolean }) {
   return (
     <div className="board" aria-label="Project board">
-      {columns.map((column) => {
-        const columnIssues = issues.filter((issue) => issue.status === column.status);
+      {statuses.map((column) => {
+        const columnIssues = issues.filter((issue) => issue.status === column.name);
         const points = columnIssues.reduce((sum, issue) => sum + (issue.points ?? 0), 0);
         return (
-          <section className="board-column" key={column.status} onDragOver={(event) => { if (!readOnly) event.preventDefault(); }} onDrop={(event) => { if (readOnly) return; const id = event.dataTransfer.getData("text/plain"); if (id) onMove(id, column.status); }}>
-            <header className="column-header"><span className="status-indicator" style={{ background: column.tint }} /><strong>{column.label}</strong><span className="column-count">{columnIssues.length}</span><span className="points-total">{points} pts</span><button aria-label={`${column.label} options`}><MoreHorizontal size={16} /></button></header>
+          <section className="board-column" key={column.id} onDragOver={(event) => { if (!readOnly) event.preventDefault(); }} onDrop={(event) => { if (readOnly) return; const id = event.dataTransfer.getData("text/plain"); if (id) onMove(id, column.name); }}>
+            <header className="column-header"><span className="status-indicator" style={{ background: column.color }} /><strong>{column.name}</strong><span className="column-count">{columnIssues.length}</span><span className="points-total">{points} pts</span><button aria-label={`${column.name} options`}><MoreHorizontal size={16} /></button></header>
             <div className="card-list">
               {columnIssues.map((issue) => <IssueCard key={issue.id} issue={issue} onSelect={() => onSelect(issue)} draggable={!readOnly} />)}
               {columnIssues.length === 0 && <div className="empty-column">Drop issues here</div>}

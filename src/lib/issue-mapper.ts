@@ -1,20 +1,18 @@
 import type { Issue as PrismaIssue, IssueType, Status, User } from "@prisma/client";
-import type { Issue, IssueType as UiIssueType, Priority, Status as UiStatus } from "./types";
+import type { Issue, Priority, Status as UiStatus } from "./types";
 
 type IssueRecord = PrismaIssue & {
   assignee: User | null;
+  reporter: User;
   issueType: IssueType;
   status: Status;
   labels: { label: { name: string } }[];
   _count: { comments: number; attachments: number };
+  sprintIssues: { sprint: { id: string; name: string } }[];
 };
 
 const priorities: Record<string, Priority> = {
   URGENT: "Urgent", HIGH: "High", MEDIUM: "Medium", LOW: "Low",
-};
-
-const types: Record<string, UiIssueType> = {
-  EPIC: "Epic", STORY: "Story", TASK: "Task", BUG: "Bug", SUBTASK: "Task",
 };
 
 export function toUiIssue(issue: IssueRecord, projectKey: string): Issue {
@@ -25,7 +23,7 @@ export function toUiIssue(issue: IssueRecord, projectKey: string): Issue {
     description: typeof issue.description === "string" ? issue.description : "No description yet.",
     status: issue.status.name as UiStatus,
     priority: priorities[issue.priority],
-    type: types[issue.issueType.kind],
+    type: issue.issueType.name,
     assignee: issue.assignee ? {
       id: issue.assignee.id,
       name: issue.assignee.name,
@@ -38,6 +36,10 @@ export function toUiIssue(issue: IssueRecord, projectKey: string): Issue {
     dueDate: issue.dueDate ? issue.dueDate.toISOString().slice(0, 10) : undefined,
     comments: issue._count.comments,
     attachments: issue._count.attachments,
+    reporter: { id: issue.reporter.id, name: issue.reporter.name, initials: issue.reporter.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(), color: avatarColor(issue.reporter.id) },
+    sprint: issue.sprintIssues[0]?.sprint,
+    createdAt: issue.createdAt.toISOString(),
+    updatedAt: issue.updatedAt.toISOString(),
   };
 }
 

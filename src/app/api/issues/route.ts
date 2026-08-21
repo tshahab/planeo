@@ -44,12 +44,14 @@ export async function POST(request: Request) {
   const projectMembership = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } });
   if (projectMembership?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot create issues." }, { status: 403 });
   const [status, issueType, reporter, assignee] = await Promise.all([
-    db.status.findFirstOrThrow({ where: { projectId: project.id, name: "To do" } }),
-    db.issueType.findFirstOrThrow({ where: { projectId: project.id, kind: "TASK" } }),
+    db.status.findFirstOrThrow({ where: { projectId: project.id }, orderBy: { position: "asc" } }),
+    typeof body.issueTypeId === "string"
+      ? db.issueType.findFirstOrThrow({ where: { projectId: project.id, id: body.issueTypeId } })
+      : db.issueType.findFirstOrThrow({ where: { projectId: project.id }, orderBy: { position: "asc" } }),
     db.user.findUniqueOrThrow({ where: { id: context.user.id } }),
     typeof body.assigneeId === "string" ? db.user.findFirst({ where: {
       OR: [{ id: body.assigneeId }, { email: `${body.assigneeId}@planeo.co` }],
-      memberships: { some: { workspaceId: project.workspaceId } },
+      projectRoles: { some: { projectId: project.id } },
     } }) : null,
   ]);
 
