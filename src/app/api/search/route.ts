@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     ...(priority ? { priority } : {}),
     ...(params.get("label") ? { labels: { some: { labelId: params.get("label")! } } } : {}),
     ...(params.get("sprint") ? { sprintIssues: { some: { sprintId: params.get("sprint")! } } } : {}),
+    ...(params.get("overdue") === "true" ? { dueDate: { lt: new Date() }, status: { category: { not: "DONE" } } } : {}),
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
   };
   const orderBy: Prisma.IssueOrderByWithRelationInput[] = sort === "created" ? [{ createdAt: "desc" }] : sort === "priority" ? [{ priority: "asc" }, { updatedAt: "desc" }] : sort === "due" ? [{ dueDate: { sort: "asc", nulls: "last" } }] : sort === "rank" ? [{ rank: "asc" }] : [{ updatedAt: "desc" }];

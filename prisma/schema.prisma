@@ -89,6 +89,7 @@ model User {
   sentNotifications Notification[] @relation("NotificationActor")
   watchedIssues   IssueWatcher[]
   savedFilters    SavedFilter[]
+  recentIssueViews RecentIssueView[]
 }
 
 model Workspace {
@@ -101,6 +102,7 @@ model Workspace {
   projects      Project[]
   labels        Label[]
   notifications Notification[]
+  recentViews RecentIssueView[]
   auditEvents   AuditEvent[]
   invitations   WorkspaceInvitation[]
   savedFilters  SavedFilter[]
@@ -238,6 +240,7 @@ model Issue {
   inwardLinks  IssueLink[]     @relation("InwardIssue")
   watchers     IssueWatcher[]
   notifications Notification[]
+  recentViews  RecentIssueView[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
@@ -425,6 +428,19 @@ model SavedFilter {
 
   @@unique([workspaceId, ownerId, name])
   @@index([workspaceId, shared, updatedAt])
+}
+
+model RecentIssueView {
+  userId     String
+  issueId    String
+  workspaceId String
+  viewedAt   DateTime @updatedAt
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue      Issue     @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, issueId])
+  @@index([workspaceId, userId, viewedAt])
 }
 
 model AuditEvent {

@@ -13,6 +13,7 @@ import { CreateProject } from "./create-project";
 import { ProjectMembers } from "./project-members";
 import { IssuePanel } from "./issue-panel";
 import { Backlog } from "./backlog";
+import { ProjectSummary as ProjectSummaryView } from "./project-summary";
 import type { Issue, Person, ProjectIssueType, ProjectStatus, ProjectSummary, Status } from "@/lib/types";
 
 export function WorkspaceApp({ currentUser, workspaceName, project, projects, statuses, issueTypes, projectPeople, activeSprint, canManageProjects, canManageProject, canWriteProject }: { currentUser: Person; workspaceName: string; project: ProjectSummary; projects: ProjectSummary[]; statuses: ProjectStatus[]; issueTypes: ProjectIssueType[]; projectPeople: Person[]; activeSprint: { id: string; name: string; endsAt?: string } | null; canManageProjects: boolean; canManageProject: boolean; canWriteProject: boolean }) {
@@ -27,7 +28,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"All" | "Mine">("All");
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [view, setView] = useState<"board" | "backlog">("board");
+  const [view, setView] = useState<"summary" | "board" | "backlog">("summary");
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => { const controller = new AbortController(); fetch("/api/notifications?page=1", { signal: controller.signal }).then((response) => response.ok ? response.json() : { unread: 0 }).then((result: { unread: number }) => setUnreadNotifications(result.unread)).catch(() => undefined); return () => controller.abort(); }, []);
@@ -53,7 +54,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   function closeIssue() {
     setSelectedIssue(null);
     const returnTo = searchParams.get("returnTo");
-    if (returnTo === "/notifications" || returnTo?.startsWith("/search")) router.push(returnTo);
+    if (returnTo === "/" || returnTo === "/notifications" || returnTo?.startsWith("/search")) router.push(returnTo);
   }
 
   const visibleIssues = useMemo(() => issues.filter((issue) => {
@@ -120,7 +121,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         {canWriteProject && <button className="create-button" onClick={() => setCreating(true)}><Plus size={17} /> Create issue <kbd>C</kbd></button>}
 
         <nav aria-label="Main navigation">
-          <a href="#" className="nav-item"><LayoutDashboard /> Home</a>
+          <Link href="/" className="nav-item"><LayoutDashboard /> Home</Link>
           <a href="#" className="nav-item"><Inbox /> Your work <span className="nav-count">5</span></a>
           <Link href="/search" className="nav-item"><Search /> Search</Link>
           <Link href="/notifications" className="nav-item"><Bell /> Notifications {unreadNotifications > 0 && <span className="nav-count">{unreadNotifications}</span>}</Link>
@@ -152,7 +153,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
             <div><span className="eyebrow">{project.key} PROJECT</span><h1>{project.name}</h1><p>{project.description || "Plan and deliver your team's work."}</p></div>
             <div className="header-actions"><div className="avatar-stack">{projectPeople.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}{projectPeople.length > 4 && <span className="more-people">+{projectPeople.length - 4}</span>}</div>{canManageProject && <button className="secondary-button" onClick={() => setManagingMembers(true)}><Settings size={16} /> Project settings</button>}{canWriteProject && <button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Create</button>}</div>
           </div>
-          <div className="tabs" role="tablist"><button>Summary</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><button>Issues</button></div>
+          <div className="tabs" role="tablist"><button className={view === "summary" ? "active" : ""} onClick={() => setView("summary")}>Summary</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><button>Issues</button></div>
         </section>
 
         {view === "board" && <><section className="board-toolbar">
@@ -164,6 +165,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         </section>
 
         <Board issues={visibleIssues} statuses={statuses} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={() => setCreating(true)} readOnly={!canWriteProject} /></>}
+        {view === "summary" && <ProjectSummaryView projectKey={project.key} />}
         {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={setSelectedIssue} />}
       </main>
 
