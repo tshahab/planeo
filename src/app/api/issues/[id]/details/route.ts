@@ -12,6 +12,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const scope = await db.issue.findFirst({ where: { id, workspaceId: context.workspace.id, archivedAt: null }, include: { project: { select: { key: true } } } });
   if (!scope) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   await getProjectForContext(context, scope.project.key);
+  await db.recentIssueView.upsert({ where: { userId_issueId: { userId: context.user.id, issueId: id } }, update: { workspaceId: context.workspace.id }, create: { userId: context.user.id, issueId: id, workspaceId: context.workspace.id } });
 
   const [comments, activities, attachments, subtasks] = await Promise.all([
     db.comment.findMany({ where: { issueId: id, deletedAt: null }, include: { author: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } }),
