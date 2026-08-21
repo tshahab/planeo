@@ -1,0 +1,18 @@
+"use client";
+
+import { Bell, CheckCheck } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type Item = { id: string; type: string; title: string; resourceUrl: string; readAt: string | null; createdAt: string; actor: { name: string } | null; issue: { project: { name: string } } | null };
+type Payload = { items: Item[]; total: number; unread: number; page: number; pageSize: number; error?: string };
+
+export function NotificationInbox({ workspaceName }: { workspaceName: string }) {
+  const [data, setData] = useState<Payload | null>(null); const [page, setPage] = useState(1); const [error, setError] = useState<string | null>(null);
+  useEffect(() => { const controller = new AbortController(); fetch(`/api/notifications?page=${page}`, { signal: controller.signal }).then(async (response) => { const result = await response.json() as Payload; if (!response.ok) throw new Error(result.error ?? "Notifications could not be loaded."); return result; }).then(setData).catch((cause: Error) => { if (cause.name !== "AbortError") setError(cause.message); }); return () => controller.abort(); }, [page]);
+  async function markAllRead() { const response = await fetch("/api/notifications", { method: "PATCH" }); if (!response.ok) return setError("Notifications could not be marked as read."); setData((current) => current ? { ...current, unread: 0, items: current.items.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })) } : current); }
+  async function markRead(id: string) { await fetch(`/api/notifications/${id}`, { method: "PATCH" }); setData((current) => current ? { ...current, unread: Math.max(0, current.unread - Number(!current.items.find((item) => item.id === id)?.readAt)), items: current.items.map((item) => item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item) } : current); }
+  const pages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? 25)));
+  return <main className="notification-page"><header><Link href="/" className="search-brand"><span>P</span> Planeo</Link><div><strong>{workspaceName}</strong><small>Notification inbox</small></div></header><section className="notification-content"><div className="notification-heading"><div><Bell /><span>Inbox</span><h1>Notifications</h1><p>Assignments, mentions, comments, and changes to watched issues.</p></div><button disabled={!data?.unread} onClick={markAllRead}><CheckCheck /> Mark all read</button></div>{error && <div className="search-state search-state-error" role="alert">{error}</div>}{!data && !error && <div className="search-state" role="status">Loading notifications…</div>}{data?.items.length === 0 && <div className="search-state">You’re all caught up.</div>}<div className="notification-list">{data?.items.map((item) => <Link href={item.resourceUrl} key={item.id} className={item.readAt ? "" : "unread"} onClick={() => void markRead(item.id)}><i /><span><strong>{item.title}</strong><small>{item.issue?.project.name} · {item.actor?.name ?? "System"} · {formatTime(item.createdAt)}</small></span></Link>)}</div>{data && data.total > data.pageSize && <nav className="search-pagination" aria-label="Notification pages"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button><span>Page {page} of {pages}</span><button disabled={page >= pages} onClick={() => setPage((value) => value + 1)}>Next</button></nav>}</section></main>;
+}
+function formatTime(value: string) { return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value)); }

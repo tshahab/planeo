@@ -85,7 +85,9 @@ model User {
   assignedIssues Issue[]           @relation("Assignee")
   comments       Comment[]
   activities     IssueActivity[]
-  notifications  Notification[]
+  notifications  Notification[]  @relation("NotificationRecipient")
+  sentNotifications Notification[] @relation("NotificationActor")
+  watchedIssues   IssueWatcher[]
 }
 
 model Workspace {
@@ -232,6 +234,8 @@ model Issue {
   sprintIssues SprintIssue[]
   outwardLinks IssueLink[]     @relation("OutwardIssue")
   inwardLinks  IssueLink[]     @relation("InwardIssue")
+  watchers     IssueWatcher[]
+  notifications Notification[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
@@ -377,15 +381,32 @@ model Notification {
   id          String           @id @default(cuid())
   workspaceId String
   userId      String
+  issueId     String?
+  actorId     String?
   type        NotificationType
   title       String
   resourceUrl String
   readAt      DateTime?
   createdAt   DateTime         @default(now())
+  dedupeKey   String           @unique
   workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  issue       Issue?           @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  actor       User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([userId, readAt, createdAt])
+  @@index([issueId, createdAt])
+}
+
+model IssueWatcher {
+  issueId   String
+  userId    String
+  createdAt DateTime @default(now())
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([issueId, userId])
+  @@index([userId])
 }
 
 model AuditEvent {

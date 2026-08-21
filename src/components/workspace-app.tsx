@@ -28,6 +28,9 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   const [filter, setFilter] = useState<"All" | "Mine">("All");
   const [syncError, setSyncError] = useState<string | null>(null);
   const [view, setView] = useState<"board" | "backlog">("board");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => { const controller = new AbortController(); fetch("/api/notifications?page=1", { signal: controller.signal }).then((response) => response.ok ? response.json() : { unread: 0 }).then((result: { unread: number }) => setUnreadNotifications(result.unread)).catch(() => undefined); return () => controller.abort(); }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,7 +53,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   function closeIssue() {
     setSelectedIssue(null);
     const returnTo = searchParams.get("returnTo");
-    if (returnTo?.startsWith("/search")) router.push(returnTo);
+    if (returnTo === "/notifications" || returnTo?.startsWith("/search")) router.push(returnTo);
   }
 
   const visibleIssues = useMemo(() => issues.filter((issue) => {
@@ -120,7 +123,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
           <a href="#" className="nav-item"><LayoutDashboard /> Home</a>
           <a href="#" className="nav-item"><Inbox /> Your work <span className="nav-count">5</span></a>
           <Link href="/search" className="nav-item"><Search /> Search</Link>
-          <a href="#" className="nav-item"><Bell /> Notifications <span className="notification-dot" /></a>
+          <Link href="/notifications" className="nav-item"><Bell /> Notifications {unreadNotifications > 0 && <span className="nav-count">{unreadNotifications}</span>}</Link>
         </nav>
 
         <div className="nav-section">
@@ -141,7 +144,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         <header className="topbar">
           <button className="menu-button" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><span>Projects</span><span>/</span><strong>{project.name}</strong></div>
-          <div className="top-actions"><button className="icon-button" aria-label="Notifications"><Bell size={18} /><i /></button><Avatar person={currentUser} /></div>
+          <div className="top-actions"><Link href="/notifications" className="icon-button" aria-label={`${unreadNotifications} unread notifications`}><Bell size={18} />{unreadNotifications > 0 && <i />}</Link><Avatar person={currentUser} /></div>
         </header>
 
         <section className="project-header">
