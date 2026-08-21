@@ -88,6 +88,7 @@ model User {
   notifications  Notification[]  @relation("NotificationRecipient")
   sentNotifications Notification[] @relation("NotificationActor")
   watchedIssues   IssueWatcher[]
+  savedFilters    SavedFilter[]
 }
 
 model Workspace {
@@ -102,6 +103,7 @@ model Workspace {
   notifications Notification[]
   auditEvents   AuditEvent[]
   invitations   WorkspaceInvitation[]
+  savedFilters  SavedFilter[]
 }
 
 model WorkspaceInvitation {
@@ -407,6 +409,22 @@ model IssueWatcher {
 
   @@id([issueId, userId])
   @@index([userId])
+}
+
+model SavedFilter {
+  id          String   @id @default(cuid())
+  workspaceId String
+  ownerId     String
+  name        String
+  query       Json
+  shared      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, ownerId, name])
+  @@index([workspaceId, shared, updatedAt])
 }
 
 model AuditEvent {
