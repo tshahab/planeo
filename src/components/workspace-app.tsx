@@ -13,10 +13,9 @@ import { CreateProject } from "./create-project";
 import { ProjectMembers } from "./project-members";
 import { IssuePanel } from "./issue-panel";
 import { Backlog } from "./backlog";
-import { people } from "@/lib/demo-data";
-import type { Issue, Person, ProjectSummary, Status } from "@/lib/types";
+import type { Issue, Person, ProjectIssueType, ProjectStatus, ProjectSummary, Status } from "@/lib/types";
 
-export function WorkspaceApp({ currentUser, workspaceName, project, projects, canManageProjects, canManageProject, canWriteProject }: { currentUser: Person; workspaceName: string; project: ProjectSummary; projects: ProjectSummary[]; canManageProjects: boolean; canManageProject: boolean; canWriteProject: boolean }) {
+export function WorkspaceApp({ currentUser, workspaceName, project, projects, statuses, issueTypes, projectPeople, activeSprint, canManageProjects, canManageProject, canWriteProject }: { currentUser: Person; workspaceName: string; project: ProjectSummary; projects: ProjectSummary[]; statuses: ProjectStatus[]; issueTypes: ProjectIssueType[]; projectPeople: Person[]; activeSprint: { id: string; name: string; endsAt?: string } | null; canManageProjects: boolean; canManageProject: boolean; canWriteProject: boolean }) {
   const router = useRouter();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
@@ -83,7 +82,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, ca
       const response = await fetch("/api/issues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectKey: project.key, title: draft.title, description: draft.description, priority: draft.priority, assigneeId: draft.assignee?.id }),
+        body: JSON.stringify({ projectKey: project.key, title: draft.title, description: draft.description, priority: draft.priority, assigneeId: draft.assignee?.id, issueTypeId: draft.issueTypeId }),
       });
       const result = await response.json() as { issue?: Issue; error?: string };
       if (!response.ok || !result.issue) throw new Error(result.error ?? "The issue could not be created.");
@@ -137,7 +136,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, ca
         <section className="project-header">
           <div className="project-title-row">
             <div><span className="eyebrow">{project.key} PROJECT</span><h1>{project.name}</h1><p>{project.description || "Plan and deliver your team's work."}</p></div>
-            <div className="header-actions"><div className="avatar-stack">{people.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}<span className="more-people">+3</span></div>{canManageProject && <button className="secondary-button" onClick={() => setManagingMembers(true)}><Settings size={16} /> Project settings</button>}{canWriteProject && <button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Create</button>}</div>
+            <div className="header-actions"><div className="avatar-stack">{projectPeople.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}{projectPeople.length > 4 && <span className="more-people">+{projectPeople.length - 4}</span>}</div>{canManageProject && <button className="secondary-button" onClick={() => setManagingMembers(true)}><Settings size={16} /> Project settings</button>}{canWriteProject && <button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Create</button>}</div>
           </div>
           <div className="tabs" role="tablist"><button>Summary</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><button>Issues</button></div>
         </section>
@@ -147,15 +146,15 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, ca
           <button className={`filter-button ${filter === "Mine" ? "filter-active" : ""}`} onClick={() => setFilter((value) => value === "All" ? "Mine" : "All")}><ListFilter size={16} /> {filter === "Mine" ? "Assigned to me" : "Filter"}</button>
           <div className="toolbar-divider" />
           <button className="view-button"><FolderKanban size={16} /> Board <ChevronDown size={14} /></button>
-          {project.template === "SCRUM" && <div className="sprint-chip"><Sparkles size={14} /><span>Sprint 8</span><strong>6 days left</strong></div>}
+          {project.template === "SCRUM" && activeSprint && <div className="sprint-chip"><Sparkles size={14} /><span>{activeSprint.name}</span>{activeSprint.endsAt && <strong>Ends {new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(activeSprint.endsAt))}</strong>}</div>}
         </section>
 
-        <Board issues={visibleIssues} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={() => setCreating(true)} readOnly={!canWriteProject} /></>}
+        <Board issues={visibleIssues} statuses={statuses} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={() => setCreating(true)} readOnly={!canWriteProject} /></>}
         {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={setSelectedIssue} />}
       </main>
 
-      {selectedIssue && <IssuePanel issue={selectedIssue} onClose={() => setSelectedIssue(null)} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} readOnly={!canWriteProject} />}
-      {creating && <CreateIssue people={people} nextNumber={issues.length + 1} onClose={() => setCreating(false)} onCreate={addIssue} />}
+      {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={() => setSelectedIssue(null)} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} readOnly={!canWriteProject} />}
+      {creating && <CreateIssue project={project} people={projectPeople} issueTypes={issueTypes} statuses={statuses} nextNumber={issues.length + 1} onClose={() => setCreating(false)} onCreate={addIssue} />}
       {creatingProject && <CreateProject onClose={() => setCreatingProject(false)} />}
       {managingMembers && <ProjectMembers projectKey={project.key} projectName={project.name} onClose={() => setManagingMembers(false)} />}
       {syncError && <div className="sync-error" role="alert"><span>{syncError}</span><button onClick={() => setSyncError(null)} aria-label="Dismiss error"><X size={15} /></button></div>}

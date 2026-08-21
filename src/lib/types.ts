@@ -1,6 +1,9 @@
-export type Status = "Backlog" | "To do" | "In progress" | "In review" | "Done";
+export type Status = string;
 export type Priority = "Urgent" | "High" | "Medium" | "Low";
-export type IssueType = "Epic" | "Story" | "Task" | "Bug";
+export type IssueType = string;
+
+export interface ProjectStatus { id: string; name: string; color: string; category: "TODO" | "IN_PROGRESS" | "DONE"; }
+export interface ProjectIssueType { id: string; name: string; kind: string; }
 
 export interface Person {
   id: string;
@@ -11,6 +14,7 @@ export interface Person {
 
 export interface Issue {
   id: string;
+  issueTypeId?: string;
   key: string;
   title: string;
   description: string;
@@ -24,6 +28,10 @@ export interface Issue {
   dueDate?: string;
   comments: number;
   attachments: number;
+  reporter?: Person;
+  sprint?: { id: string; name: string };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ProjectSummary {

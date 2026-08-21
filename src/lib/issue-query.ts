@@ -3,8 +3,10 @@ import type { AuthContext } from "./auth";
 
 export const issueInclude = {
   assignee: true,
+  reporter: true,
   issueType: true,
   status: true,
+  sprintIssues: { include: { sprint: { select: { id: true, name: true } } }, orderBy: { addedAt: "desc" as const }, take: 1 },
   labels: { include: { label: true } },
   _count: { select: { comments: true, attachments: true } },
 } as const;
