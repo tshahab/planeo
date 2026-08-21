@@ -23,6 +23,7 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [addingLabel, setAddingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState("");
+  const [watching, setWatching] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -43,6 +44,10 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
     fetch(`/api/projects/${key}/people`, { signal: controller.signal }).then((response) => response.ok ? response.json() : { people: [] }).then((result: { people?: Person[] }) => setProjectPeople(result.people ?? [])).catch(() => undefined);
     return () => controller.abort();
   }, [issue.key]);
+
+  useEffect(() => { const controller = new AbortController(); fetch(`/api/issues/${issue.id}/watch`, { signal: controller.signal }).then((response) => response.ok ? response.json() : { watching: false }).then((result: { watching: boolean }) => setWatching(result.watching)).catch(() => undefined); return () => controller.abort(); }, [issue.id]);
+
+  async function toggleWatching() { const response = await fetch(`/api/issues/${issue.id}/watch`, { method: watching ? "DELETE" : "PUT" }); const result = await response.json() as { watching?: boolean; error?: string }; if (!response.ok) return setActivityError(result.error ?? "Watch state could not be changed."); setWatching(Boolean(result.watching)); }
 
   async function submitComment() {
     if (!comment.trim() || readOnly) return;
@@ -107,7 +112,7 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
     <div className="panel-layer">
       <button className="panel-scrim" onClick={onClose} aria-label="Close issue" />
       <aside className="issue-panel" aria-label={`${issue.key} details`}>
-        <header className="panel-header"><div className="panel-key"><span>{issue.key.split("-")[0]}</span><span>/</span><strong>{issue.key}</strong></div><div><button aria-label="Watch issue"><Bell size={17} /></button><button aria-label="Copy link"><Link2 size={17} /></button><button aria-label="More actions"><MoreHorizontal size={18} /></button><button aria-label="Close" onClick={onClose}><X size={20} /></button></div></header>
+        <header className="panel-header"><div className="panel-key"><span>{issue.key.split("-")[0]}</span><span>/</span><strong>{issue.key}</strong></div><div><button aria-label={watching ? "Stop watching issue" : "Watch issue"} aria-pressed={watching} onClick={() => void toggleWatching()}><Bell size={17} fill={watching ? "currentColor" : "none"} /></button><button aria-label="Copy link"><Link2 size={17} /></button><button aria-label="More actions"><MoreHorizontal size={18} /></button><button aria-label="Close" onClick={onClose}><X size={20} /></button></div></header>
         <div className="panel-body">
           <main className="issue-main">
             <div className="issue-type-line"><span className={`type-pill ${issue.type.toLowerCase()}`}>{issue.type}</span><span>Created {issue.createdAt ? formatTime(issue.createdAt) : "recently"}</span></div>

@@ -1,0 +1,13 @@
+ALTER TABLE "Notification" ADD COLUMN "issueId" TEXT;
+ALTER TABLE "Notification" ADD COLUMN "actorId" TEXT;
+ALTER TABLE "Notification" ADD COLUMN "dedupeKey" TEXT;
+UPDATE "Notification" SET "dedupeKey" = "id" WHERE "dedupeKey" IS NULL;
+ALTER TABLE "Notification" ALTER COLUMN "dedupeKey" SET NOT NULL;
+CREATE UNIQUE INDEX "Notification_dedupeKey_key" ON "Notification"("dedupeKey");
+CREATE INDEX "Notification_issueId_createdAt_idx" ON "Notification"("issueId", "createdAt");
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_issueId_fkey" FOREIGN KEY ("issueId") REFERENCES "Issue"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE TABLE "IssueWatcher" ("issueId" TEXT NOT NULL, "userId" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "IssueWatcher_pkey" PRIMARY KEY ("issueId", "userId"));
+CREATE INDEX "IssueWatcher_userId_idx" ON "IssueWatcher"("userId");
+ALTER TABLE "IssueWatcher" ADD CONSTRAINT "IssueWatcher_issueId_fkey" FOREIGN KEY ("issueId") REFERENCES "Issue"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "IssueWatcher" ADD CONSTRAINT "IssueWatcher_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

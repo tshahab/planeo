@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { toUiIssue } from "@/lib/issue-mapper";
 import { getProjectForContext, issueInclude } from "@/lib/issue-query";
 import type { Prisma } from "@prisma/client";
+import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -16,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const project = await getProjectForContext(context, issueScope.project.key);
   const projectMembership = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } });
   if (projectMembership?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot update issues." }, { status: 403 });
-  const existing = await db.issue.findFirst({ where: { id, workspaceId: project.workspaceId, projectId: project.id, archivedAt: null } });
+  const existing = await db.issue.findFirst({ where: { id, workspaceId: project.workspaceId, projectId: project.id, archivedAt: null }, include: { watchers: { select: { userId: true } } } });
   if (!existing) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
 
   const data: { statusId?: string; summary?: string; description?: string; priority?: "URGENT" | "HIGH" | "MEDIUM" | "LOW"; estimate?: number | null; assigneeId?: string | null; dueDate?: Date | null; completedAt?: Date | null } = {};
@@ -80,6 +81,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     changes.labels = labelNames;
   }
   if (Object.keys(data).length === 0 && labelNames === undefined) return NextResponse.json({ error: "No supported changes were provided." }, { status: 400 });
+  const mentions = typeof data.description === "string" ? await db.user.findMany({ where: { email: { in: mentionedEmails(data.description), mode: "insensitive" }, memberships: { some: { workspaceId: project.workspaceId } }, OR: [{ projectRoles: { some: { projectId: project.id } } }, ...(project.visibility === "PUBLIC" ? [{}] : [])] }, select: { id: true } }) : [];
 
   const issue = await db.$transaction(async (tx) => {
     if (labelNames !== undefined) {
@@ -92,9 +94,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       data: { ...data, version: { increment: 1 } },
       include: issueInclude,
     });
-    await tx.issueActivity.create({
+    const activity = await tx.issueActivity.create({
       data: { issueId: id, actorId: context.user.id, action: data.statusId && Object.keys(changes).length === 1 ? "issue.status_changed" : "issue.updated", changes: JSON.parse(JSON.stringify(changes)) as Prisma.InputJsonValue },
     });
+    const base = { workspaceId: project.workspaceId, issueId: id, issueKey: `${project.key}-${existing.number}`, issueTitle: data.summary ?? existing.summary, actorId: context.user.id, eventId: activity.id };
+    if (data.assigneeId && data.assigneeId !== existing.assigneeId) await createIssueNotifications(tx, { ...base, type: "ASSIGNED", recipientIds: [data.assigneeId] });
+    await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });
+    await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: existing.watchers.map(({ userId }) => userId) });
     return updated;
   });
   return NextResponse.json({ issue: toUiIssue(issue, project.key) });

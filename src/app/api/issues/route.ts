@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { toUiIssue } from "@/lib/issue-mapper";
 import { getProjectForContext, issueInclude } from "@/lib/issue-query";
+import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
 
 export async function GET(request: Request) {
   const context = await getAuthContext();
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
   const allowedPriorities = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
   const requestedPriority = typeof body.priority === "string" ? body.priority.toUpperCase() : "MEDIUM";
   const priority = allowedPriorities.find((value) => value === requestedPriority) ?? "MEDIUM";
+  const mentions = await db.user.findMany({ where: { email: { in: mentionedEmails(description), mode: "insensitive" }, memberships: { some: { workspaceId: project.workspaceId } }, OR: [{ projectRoles: { some: { projectId: project.id } } }, ...(project.visibility === "PUBLIC" ? [{}] : [])] }, select: { id: true } });
 
   const issue = await db.$transaction(async (tx) => {
     const updatedProject = await tx.project.update({
@@ -81,7 +83,10 @@ export async function POST(request: Request) {
       },
       include: issueInclude,
     });
-    await tx.issueActivity.create({ data: { issueId: created.id, actorId: reporter.id, action: "issue.created" } });
+    const activity = await tx.issueActivity.create({ data: { issueId: created.id, actorId: reporter.id, action: "issue.created" } });
+    const base = { workspaceId: project.workspaceId, issueId: created.id, issueKey: `${project.key}-${created.number}`, issueTitle: created.summary, actorId: reporter.id, eventId: activity.id };
+    if (created.assigneeId) await createIssueNotifications(tx, { ...base, type: "ASSIGNED", recipientIds: [created.assigneeId] });
+    await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });
     return created;
   });
 
