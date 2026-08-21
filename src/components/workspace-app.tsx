@@ -5,7 +5,7 @@ import {
   ListFilter, Menu, MoreHorizontal, Plus, Search, Settings, Sparkles, Users, X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Board } from "./board";
 import { CreateIssue } from "./create-issue";
@@ -17,6 +17,7 @@ import type { Issue, Person, ProjectIssueType, ProjectStatus, ProjectSummary, St
 
 export function WorkspaceApp({ currentUser, workspaceName, project, projects, statuses, issueTypes, projectPeople, activeSprint, canManageProjects, canManageProject, canWriteProject }: { currentUser: Person; workspaceName: string; project: ProjectSummary; projects: ProjectSummary[]; statuses: ProjectStatus[]; issueTypes: ProjectIssueType[]; projectPeople: Person[]; activeSprint: { id: string; name: string; endsAt?: string } | null; canManageProjects: boolean; canManageProject: boolean; canWriteProject: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [creating, setCreating] = useState(false);
@@ -35,12 +36,22 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         if (!response.ok) throw new Error("Could not load issues from the database.");
         return response.json() as Promise<{ issues: Issue[] }>;
       })
-      .then(({ issues: persistedIssues }) => setIssues(persistedIssues))
+      .then(({ issues: persistedIssues }) => {
+        setIssues(persistedIssues);
+        const requestedIssue = searchParams.get("issue");
+        if (requestedIssue) setSelectedIssue(persistedIssues.find((issue) => issue.id === requestedIssue) ?? null);
+      })
       .catch((error: Error) => {
         if (error.name !== "AbortError") setSyncError(error.message);
       });
     return () => controller.abort();
-  }, [project.key]);
+  }, [project.key, searchParams]);
+
+  function closeIssue() {
+    setSelectedIssue(null);
+    const returnTo = searchParams.get("returnTo");
+    if (returnTo?.startsWith("/search")) router.push(returnTo);
+  }
 
   const visibleIssues = useMemo(() => issues.filter((issue) => {
     const matchesQuery = `${issue.key} ${issue.title} ${issue.labels.join(" ")}`.toLowerCase().includes(query.toLowerCase());
@@ -108,7 +119,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         <nav aria-label="Main navigation">
           <a href="#" className="nav-item"><LayoutDashboard /> Home</a>
           <a href="#" className="nav-item"><Inbox /> Your work <span className="nav-count">5</span></a>
-          <a href="#" className="nav-item"><Search /> Search</a>
+          <Link href="/search" className="nav-item"><Search /> Search</Link>
           <a href="#" className="nav-item"><Bell /> Notifications <span className="notification-dot" /></a>
         </nav>
 
@@ -153,7 +164,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={setSelectedIssue} />}
       </main>
 
-      {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={() => setSelectedIssue(null)} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} readOnly={!canWriteProject} />}
+      {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={closeIssue} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} readOnly={!canWriteProject} />}
       {creating && <CreateIssue project={project} people={projectPeople} issueTypes={issueTypes} statuses={statuses} nextNumber={issues.length + 1} onClose={() => setCreating(false)} onCreate={addIssue} />}
       {creatingProject && <CreateProject onClose={() => setCreatingProject(false)} />}
       {managingMembers && <ProjectMembers projectKey={project.key} projectName={project.name} onClose={() => setManagingMembers(false)} />}
