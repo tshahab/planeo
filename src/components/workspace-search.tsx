@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Bookmark, Search, Share2, SlidersHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,14 +8,18 @@ import type { Issue } from "@/lib/types";
 
 type Filters = { projects: Array<{ id: string; key: string; name: string; statuses: Array<{ id: string; name: string }>; issueTypes: Array<{ id: string; name: string }> }>; members: Array<{ id: string; name: string }>; labels: Array<{ id: string; name: string }>; sprints: Array<{ id: string; name: string; projectId: string }> };
 type Payload = { results: Array<Issue & { projectName: string }>; total: number; page: number; pageSize: number; filters: Filters; error?: string };
+type SavedFilter = { id: string; name: string; query: Record<string, string>; shared: boolean; ownerId: string; owner: { name: string } };
 
-export function WorkspaceSearch({ workspaceName }: { workspaceName: string }) {
+export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceName: string; currentUserId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [saveName, setSaveName] = useState("");
+  const [shareNew, setShareNew] = useState(false);
   const queryString = searchParams.toString();
 
   useEffect(() => {
@@ -28,6 +32,8 @@ export function WorkspaceSearch({ workspaceName }: { workspaceName: string }) {
     return () => controller.abort();
   }, [queryString]);
 
+  useEffect(() => { const controller = new AbortController(); fetch("/api/saved-filters", { signal: controller.signal }).then((response) => response.ok ? response.json() : { filters: [] }).then((result: { filters: SavedFilter[] }) => setSavedFilters(result.filters)).catch(() => undefined); return () => controller.abort(); }, []);
+
   function update(name: string, value: string) {
     setLoading(true);
     setError(null);
@@ -36,6 +42,11 @@ export function WorkspaceSearch({ workspaceName }: { workspaceName: string }) {
     if (name !== "page") next.delete("page");
     router.replace(`${pathname}?${next.toString()}`);
   }
+  function activeQuery() { const result: Record<string, string> = {}; searchParams.forEach((value, key) => { if (key !== "page") result[key] = value; }); return result; }
+  async function saveFilter() { if (!saveName.trim()) return; const response = await fetch("/api/saved-filters", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: saveName.trim(), query: activeQuery(), shared: shareNew }) }); const result = await response.json() as { filter?: SavedFilter; error?: string }; if (!response.ok || !result.filter) return setError(result.error ?? "Filter could not be saved."); setSavedFilters((items) => [...items, result.filter!]); setSaveName(""); setShareNew(false); }
+  function applyFilter(filter: SavedFilter) { const params = new URLSearchParams(filter.query); setLoading(true); router.replace(`${pathname}?${params.toString()}`); }
+  async function changeFilter(filter: SavedFilter, changes: Record<string, unknown>) { const response = await fetch(`/api/saved-filters/${filter.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(changes) }); const result = await response.json() as { filter?: SavedFilter; error?: string }; if (!response.ok || !result.filter) return setError(result.error ?? "Filter could not be updated."); setSavedFilters((items) => items.map((item) => item.id === filter.id ? result.filter! : item)); }
+  async function deleteFilter(filter: SavedFilter) { const response = await fetch(`/api/saved-filters/${filter.id}`, { method: "DELETE" }); if (!response.ok) return setError("Filter could not be deleted."); setSavedFilters((items) => items.filter((item) => item.id !== filter.id)); }
   const selectedProject = data?.filters.projects.find((project) => project.key === searchParams.get("project"));
   const statuses = selectedProject?.statuses ?? data?.filters.projects.flatMap((project) => project.statuses) ?? [];
   const issueTypes = selectedProject?.issueTypes ?? data?.filters.projects.flatMap((project) => project.issueTypes) ?? [];
@@ -46,6 +57,7 @@ export function WorkspaceSearch({ workspaceName }: { workspaceName: string }) {
     <header><Link href="/" className="search-brand"><span>P</span> Planeo</Link><div><strong>{workspaceName}</strong><small>Workspace search</small></div></header>
     <section className="search-content">
       <div className="search-title"><div><span>Workspace</span><h1>Search issues</h1><p>Find permitted work across projects using structured filters.</p></div><SlidersHorizontal aria-hidden="true" /></div>
+      <section className="saved-filter-panel" aria-label="Saved filters"><div className="saved-filter-create"><Bookmark /><input aria-label="Saved filter name" value={saveName} maxLength={80} placeholder="Name this search" onChange={(event) => setSaveName(event.target.value)} /><label><input type="checkbox" checked={shareNew} onChange={(event) => setShareNew(event.target.checked)} /> Share with workspace</label><button disabled={!saveName.trim()} onClick={() => void saveFilter()}>Save filter</button></div>{savedFilters.length > 0 && <div className="saved-filter-list">{savedFilters.map((filter) => <div key={filter.id}><button className="saved-filter-name" onClick={() => applyFilter(filter)}><Bookmark />{filter.name}<small>{filter.shared ? `Shared by ${filter.owner.name}` : "Private"}</small></button>{filter.ownerId === currentUserId && <><button aria-label={`${filter.shared ? "Unshare" : "Share"} ${filter.name}`} onClick={() => void changeFilter(filter, { shared: !filter.shared })}><Share2 /></button><button aria-label={`Rename ${filter.name}`} onClick={() => { const name = window.prompt("Rename saved filter", filter.name); if (name?.trim()) void changeFilter(filter, { name: name.trim() }); }}>Rename</button><button aria-label={`Delete ${filter.name}`} onClick={() => void deleteFilter(filter)}><Trash2 /></button></>}</div>)}</div>}</section>
       <div className="workspace-search-input"><Search aria-hidden="true" /><input aria-label="Search issue key, summary, or description" defaultValue={searchParams.get("q") ?? ""} placeholder="Try WEB-12 or onboarding" onKeyDown={(event) => { if (event.key === "Enter") update("q", event.currentTarget.value.trim()); }} /><button onClick={(event) => update("q", event.currentTarget.parentElement?.querySelector("input")?.value.trim() ?? "")}>Search</button></div>
       <div className="search-filters" aria-label="Search filters">
         <Filter label="Project" value={searchParams.get("project") ?? ""} onChange={(value) => update("project", value)} options={data?.filters.projects.map((item) => [item.key, item.name]) ?? []} />
