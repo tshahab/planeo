@@ -133,7 +133,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         </div>
 
         <div className="sidebar-footer">
-          {canManageProjects && <Link href="/settings/workspace" className="nav-item"><Users /> Workspace admin</Link>}
+          {canManageProjects && <><Link href="/settings/workspace" className="nav-item"><Users /> Workspace admin</Link><Link href="/settings/audit" className="nav-item"><ListFilter /> Audit log</Link></>}
           <a href="#" className="nav-item"><CircleHelp /> Help & feedback</a>
           <Link href="/settings/profile" className="nav-item"><Settings /> Settings</Link>
           <div className="user-card"><Avatar person={currentUser} /><div><strong>{currentUser.name}</strong><span>Signed in</span></div><button className="logout-button" aria-label="Sign out" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.replace("/login"); router.refresh(); }}><MoreHorizontal size={16} /></button></div>

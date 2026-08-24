@@ -16,5 +16,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
   }
   await createSession(user.id, user.memberships[0].workspaceId);
+  await db.auditEvent.create({ data: { workspaceId: user.memberships[0].workspaceId, actorId: user.id, action: "identity.login", targetType: "user", targetId: user.id, metadata: {} } });
   return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } });
 }
