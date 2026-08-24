@@ -16,7 +16,7 @@ export function Board({ issues, statuses, onSelect, onMove, onCreate, readOnly =
         const points = columnIssues.reduce((sum, issue) => sum + (issue.points ?? 0), 0);
         return (
           <section className="board-column" key={column.id} onDragOver={(event) => { if (!readOnly) event.preventDefault(); }} onDrop={(event) => { if (readOnly) return; const id = event.dataTransfer.getData("text/plain"); if (id) onMove(id, column.name); }}>
-            <header className="column-header"><span className="status-indicator" style={{ background: column.color }} /><strong>{column.name}</strong><span className="column-count">{columnIssues.length}</span><span className="points-total">{points} pts</span><button aria-label={`${column.name} options`}><MoreHorizontal size={16} /></button></header>
+            <header className="column-header"><span className="status-indicator" style={{ background: column.color }} /><strong>{column.name}</strong><span className="column-count">{columnIssues.length}{column.wipLimit ? ` / ${column.wipLimit}` : ""}</span><span className="points-total">{points} pts</span><button aria-label={`${column.name} options`}><MoreHorizontal size={16} /></button></header>
             <div className="card-list">
               {columnIssues.map((issue) => <IssueCard key={issue.id} issue={issue} onSelect={() => onSelect(issue)} draggable={!readOnly} />)}
               {columnIssues.length === 0 && <div className="empty-column">Drop issues here</div>}

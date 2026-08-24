@@ -184,6 +184,7 @@ model Project {
   archivedAt    DateTime?
   leadId        String?
   defaultAssigneeId String?
+  defaultPriority Priority             @default(MEDIUM)
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   workspace     Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -194,6 +195,7 @@ model Project {
   boards        Board[]
   sprints       Sprint[]
   invitations   WorkspaceInvitation[]
+  workflowTransitions WorkflowTransition[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
 
@@ -237,8 +239,24 @@ model Status {
   project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues    Issue[]
   columns   BoardColumn[]
+  outgoingTransitions WorkflowTransition[] @relation("TransitionFrom")
+  incomingTransitions WorkflowTransition[] @relation("TransitionTo")
 
   @@unique([projectId, name])
+}
+
+model WorkflowTransition {
+  id        String @id @default(cuid())
+  projectId String
+  fromStatusId String
+  toStatusId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromStatus Status @relation("TransitionFrom", fields: [fromStatusId], references: [id], onDelete: Cascade)
+  toStatus   Status @relation("TransitionTo", fields: [toStatusId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, fromStatusId, toStatusId])
+  @@index([fromStatusId])
+  @@index([toStatusId])
 }
 
 model Issue {

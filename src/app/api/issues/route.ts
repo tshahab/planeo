@@ -57,8 +57,8 @@ export async function POST(request: Request) {
   ]);
 
   const allowedPriorities = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
-  const requestedPriority = typeof body.priority === "string" ? body.priority.toUpperCase() : "MEDIUM";
-  const priority = allowedPriorities.find((value) => value === requestedPriority) ?? "MEDIUM";
+  const requestedPriority = typeof body.priority === "string" ? body.priority.toUpperCase() : project.defaultPriority;
+  const priority = allowedPriorities.find((value) => value === requestedPriority) ?? project.defaultPriority;
   const mentions = await db.user.findMany({ where: { email: { in: mentionedEmails(description), mode: "insensitive" }, memberships: { some: { workspaceId: project.workspaceId } }, OR: [{ projectRoles: { some: { projectId: project.id } } }, ...(project.visibility === "PUBLIC" ? [{}] : [])] }, select: { id: true } });
 
   const issue = await db.$transaction(async (tx) => {
