@@ -91,7 +91,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     where: { workspaceId_userId: { workspaceId: claims.workspaceId, userId: claims.userId } },
     include: { user: true, workspace: true },
   });
-  if (!membership) return null;
+  if (!membership || membership.deactivatedAt) return null;
   return {
     user: { id: membership.user.id, email: membership.user.email, name: membership.user.name, avatarUrl: membership.user.avatarUrl, timezone: membership.user.timezone, emailNotifications: membership.user.emailNotifications, inAppNotifications: membership.user.inAppNotifications },
     workspace: { id: membership.workspace.id, name: membership.workspace.name, slug: membership.workspace.slug },

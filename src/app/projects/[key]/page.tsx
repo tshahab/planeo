@@ -18,7 +18,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
     db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } }),
     db.status.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" }, select: { id: true, name: true, color: true, category: true } }),
     db.issueType.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" }, select: { id: true, name: true, kind: true } }),
-    db.projectMember.findMany({ where: { projectId: project.id }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } } } }),
+    db.projectMember.findMany({ where: { projectId: project.id, user: { memberships: { some: { workspaceId: context.workspace.id, deactivatedAt: null } } } }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } } } }),
     db.sprint.findFirst({ where: { projectId: project.id, state: "ACTIVE" }, orderBy: { startsAt: "desc" }, select: { id: true, name: true, endsAt: true } }),
   ]);
   const canManageProject = context.role === "OWNER" || context.role === "ADMIN" || projectMembership?.role === "ADMIN";
