@@ -16,7 +16,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
   if (!project) notFound();
   const [projectMembership, statuses, issueTypes, members, activeSprint] = await Promise.all([
     db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } }),
-    db.status.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" }, select: { id: true, name: true, color: true, category: true } }),
+    db.status.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" }, select: { id: true, name: true, color: true, category: true, columns: { where: { board: { projectId: project.id } }, select: { wipLimit: true }, take: 1 } } }),
     db.issueType.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" }, select: { id: true, name: true, kind: true } }),
     db.projectMember.findMany({ where: { projectId: project.id, user: { memberships: { some: { workspaceId: context.workspace.id, deactivatedAt: null } } } }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } } } }),
     db.sprint.findFirst({ where: { projectId: project.id, state: "ACTIVE" }, orderBy: { startsAt: "desc" }, select: { id: true, name: true, endsAt: true } }),
@@ -28,7 +28,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
     workspaceName={context.workspace.name}
     project={{ id: project.id, key: project.key, name: project.name, description: project.description ?? undefined, template: project.template, visibility: project.visibility }}
     projects={projects.map((item) => ({ ...item, description: item.description ?? undefined }))}
-    statuses={statuses}
+    statuses={statuses.map(({ columns, ...status }) => ({ ...status, wipLimit: columns[0]?.wipLimit ?? undefined }))}
     issueTypes={issueTypes}
     projectPeople={members.map(({ user }) => ({ id: user.id, name: user.name, initials: user.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(), color: avatarColor(user.id) }))}
     activeSprint={activeSprint ? { ...activeSprint, endsAt: activeSprint.endsAt?.toISOString() } : null}

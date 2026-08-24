@@ -28,6 +28,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (typeof body.status !== "string") return NextResponse.json({ error: "A valid status is required." }, { status: 400 });
     const status = await db.status.findFirst({ where: { projectId: project.id, name: body.status } });
     if (!status) return NextResponse.json({ error: "Status is not part of this project." }, { status: 400 });
+    if (status.id !== existing.statusId) {
+      const [transitionCount, allowedTransition, column] = await Promise.all([
+        db.workflowTransition.count({ where: { projectId: project.id } }),
+        db.workflowTransition.findUnique({ where: { projectId_fromStatusId_toStatusId: { projectId: project.id, fromStatusId: existing.statusId, toStatusId: status.id } } }),
+        db.boardColumn.findFirst({ where: { statusId: status.id, board: { projectId: project.id } } }),
+      ]);
+      if (transitionCount > 0 && !allowedTransition) return NextResponse.json({ error: "That workflow transition is not allowed." }, { status: 409 });
+      if (column?.wipLimit) { const count = await db.issue.count({ where: { projectId: project.id, statusId: status.id, archivedAt: null } }); if (count >= column.wipLimit) return NextResponse.json({ error: `${column.name} has reached its work-in-progress limit.` }, { status: 409 }); }
+    }
     data.statusId = status.id;
     data.completedAt = status.category === "DONE" ? new Date() : null;
     changes.status = { from: existing.statusId, to: status.id };

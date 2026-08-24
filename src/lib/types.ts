@@ -2,7 +2,7 @@ export type Status = string;
 export type Priority = "Urgent" | "High" | "Medium" | "Low";
 export type IssueType = string;
 
-export interface ProjectStatus { id: string; name: string; color: string; category: "TODO" | "IN_PROGRESS" | "DONE"; }
+export interface ProjectStatus { id: string; name: string; color: string; category: "TODO" | "IN_PROGRESS" | "DONE"; wipLimit?: number; }
 export interface ProjectIssueType { id: string; name: string; kind: string; }
 
 export interface Person {
