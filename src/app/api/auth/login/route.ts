@@ -8,6 +8,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
   const email = body.email.trim().toLowerCase();
+  if (process.env.NODE_ENV === "production" && email.endsWith("@planeo.co") && body.password === "planeo-demo") {
+    return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
+  }
   const user = await db.user.findUnique({ where: { email }, include: { memberships: { orderBy: { joinedAt: "asc" }, take: 1 } } });
   if (!user?.passwordHash || !verifyPassword(body.password, user.passwordHash) || !user.memberships[0]) {
     return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
