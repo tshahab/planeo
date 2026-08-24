@@ -135,7 +135,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         <div className="sidebar-footer">
           <a href="#" className="nav-item"><Users /> Invite people</a>
           <a href="#" className="nav-item"><CircleHelp /> Help & feedback</a>
-          <a href="#" className="nav-item"><Settings /> Settings</a>
+          <Link href="/settings/profile" className="nav-item"><Settings /> Settings</Link>
           <div className="user-card"><Avatar person={currentUser} /><div><strong>{currentUser.name}</strong><span>Signed in</span></div><button className="logout-button" aria-label="Sign out" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.replace("/login"); router.refresh(); }}><MoreHorizontal size={16} /></button></div>
         </div>
       </aside>

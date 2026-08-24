@@ -6,8 +6,8 @@ const writeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 export async function proxy(request: NextRequest) {
   if (!writeMethods.has(request.method)) return NextResponse.next();
   const client = requestClientKey(request);
-  const isLogin = request.nextUrl.pathname === "/api/auth/login";
-  const limit = await consumeRateLimit(`${isLogin ? "login" : "write"}:${client}`, isLogin ? 10 : 120, isLogin ? 15 * 60 : 60);
+  const isIdentity = request.nextUrl.pathname.startsWith("/api/auth/") && request.nextUrl.pathname !== "/api/auth/logout";
+  const limit = await consumeRateLimit(`${isIdentity ? "identity" : "write"}:${client}`, isIdentity ? 10 : 120, isIdentity ? 15 * 60 : 60);
   if (!limit.allowed) return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429, headers: { "Retry-After": String(Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000))) } });
 
   if (request.cookies.has("planeo_session")) {
