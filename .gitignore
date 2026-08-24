@@ -1,4 +1,7 @@
 node_modules
+.vitest
+test-results
+playwright-report
 .pnpm-store
 .next
 out

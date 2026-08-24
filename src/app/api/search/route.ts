@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     project: { is: accessibleProjectWhere(context) },
     ...(query ? { OR: [
       { summary: { contains: query, mode: "insensitive" } },
-      { description: { string_contains: query, mode: "insensitive" } },
+      { description: { string_contains: query } },
       ...(exactKey ? [{ project: { is: { ...accessibleProjectWhere(context), key: exactKey[1].toUpperCase() } }, number: Number(exactKey[2]) }] : []),
     ] } : {}),
     ...(params.get("project") ? { project: { is: { ...accessibleProjectWhere(context), key: params.get("project")!.toUpperCase() } } } : {}),
