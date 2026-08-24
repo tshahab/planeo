@@ -133,7 +133,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         </div>
 
         <div className="sidebar-footer">
-          <a href="#" className="nav-item"><Users /> Invite people</a>
+          {canManageProjects && <Link href="/settings/workspace" className="nav-item"><Users /> Workspace admin</Link>}
           <a href="#" className="nav-item"><CircleHelp /> Help & feedback</a>
           <Link href="/settings/profile" className="nav-item"><Settings /> Settings</Link>
           <div className="user-card"><Avatar person={currentUser} /><div><strong>{currentUser.name}</strong><span>Signed in</span></div><button className="logout-button" aria-label="Sign out" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.replace("/login"); router.refresh(); }}><MoreHorizontal size={16} /></button></div>
@@ -169,7 +169,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={setSelectedIssue} />}
       </main>
 
-      {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={closeIssue} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} readOnly={!canWriteProject} />}
+      {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={closeIssue} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} onArchive={canManageProject ? async () => { const response = await fetch(`/api/issues/${selectedIssue.id}/archive`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "archive" }) }); if (!response.ok) throw new Error("Issue could not be archived."); setIssues((current) => current.filter((item) => item.id !== selectedIssue.id)); setSelectedIssue(null); } : undefined} readOnly={!canWriteProject} />}
       {creating && <CreateIssue project={project} people={projectPeople} issueTypes={issueTypes} statuses={statuses} nextNumber={issues.length + 1} onClose={() => setCreating(false)} onCreate={addIssue} />}
       {creatingProject && <CreateProject onClose={() => setCreatingProject(false)} />}
       {managingMembers && <ProjectMembers projectKey={project.key} projectName={project.name} onClose={() => setManagingMembers(false)} />}

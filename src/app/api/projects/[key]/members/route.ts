@@ -26,7 +26,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ key: strin
   const [members, pendingInvitations, workspaceMembers] = await Promise.all([
     db.projectMember.findMany({ where: { projectId: project.id }, include: { user: { select: { id: true, name: true, email: true } } }, orderBy: { user: { name: "asc" } } }),
     db.workspaceInvitation.findMany({ where: { workspaceId: context.workspace.id, projectId: project.id, status: "PENDING", expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" }, select: { id: true, email: true, projectRole: true, expiresAt: true } }),
-    db.workspaceMember.findMany({ where: { workspaceId: context.workspace.id, user: { projectRoles: { none: { projectId: project.id } } } }, include: { user: { select: { id: true, name: true, email: true } } }, orderBy: { user: { name: "asc" } } }),
+    db.workspaceMember.findMany({ where: { workspaceId: context.workspace.id, deactivatedAt: null, user: { projectRoles: { none: { projectId: project.id } } } }, include: { user: { select: { id: true, name: true, email: true } } }, orderBy: { user: { name: "asc" } } }),
   ]);
   return NextResponse.json({
     members: members.map(({ role, user }) => ({ ...user, role })),
@@ -45,7 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
   const role = roles.includes(body?.role as ProjectRoleValue) ? body?.role as ProjectRoleValue : "MEMBER";
   if (!/^\S+@\S+\.\S+$/.test(email)) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
 
-  const workspaceMember = await db.workspaceMember.findFirst({ where: { workspaceId: context.workspace.id, user: { email } }, include: { user: true } });
+  const workspaceMember = await db.workspaceMember.findFirst({ where: { workspaceId: context.workspace.id, deactivatedAt: null, user: { email } }, include: { user: true } });
   if (workspaceMember) {
     const membership = await db.projectMember.upsert({ where: { projectId_userId: { projectId: project.id, userId: workspaceMember.userId } }, update: { role }, create: { projectId: project.id, userId: workspaceMember.userId, role }, include: { user: { select: { id: true, name: true, email: true } } } });
     await db.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "project.member_added", targetType: "user", targetId: workspaceMember.userId, metadata: { projectId: project.id, role } } });

@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     const claimed = await tx.workspaceInvitation.updateMany({ where: { id: invitation.id, status: "PENDING", expiresAt: { gt: new Date() } }, data: { status: "ACCEPTED" } });
     if (claimed.count !== 1) throw new Error("INVITATION_ALREADY_CLAIMED");
     const user = existingUser ?? await tx.user.create({ data: { email: invitation.email, name, passwordHash: hashPassword(password) } });
-    await tx.workspaceMember.upsert({ where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } }, update: { role: invitation.workspaceRole }, create: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.workspaceRole } });
+    await tx.workspaceMember.upsert({ where: { workspaceId_userId: { workspaceId: invitation.workspaceId, userId: user.id } }, update: { role: invitation.workspaceRole, deactivatedAt: null }, create: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.workspaceRole } });
     if (invitation.projectId) await tx.projectMember.upsert({ where: { projectId_userId: { projectId: invitation.projectId, userId: user.id } }, update: { role: invitation.projectRole }, create: { projectId: invitation.projectId, userId: user.id, role: invitation.projectRole } });
     await tx.auditEvent.create({ data: { workspaceId: invitation.workspaceId, actorId: user.id, action: "invitation.accepted", targetType: "invitation", targetId: invitation.id, metadata: { projectId: invitation.projectId } } });
     return user;
