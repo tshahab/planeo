@@ -1,0 +1,33 @@
+name: planeo-recovery
+
+services:
+  recovery-database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: planeo_restore
+      POSTGRES_USER: planeo
+      POSTGRES_PASSWORD: recovery-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planeo -d planeo_restore"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  restore:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: recovery-only
+    volumes:
+      - ${BACKUP_DIRECTORY:?set BACKUP_DIRECTORY}:/backup:ro
+    depends_on:
+      recovery-database:
+        condition: service_healthy
+    command: ["sh", "-c", "pg_restore --host recovery-database --username planeo --dbname planeo_restore --clean --if-exists --no-owner --no-privileges /backup/database.dump && psql --host recovery-database --username planeo --dbname planeo_restore --tuples-only --command 'SELECT COUNT(*) FROM \"Workspace\"' >/dev/null"]
+
+  verify-attachments:
+    image: alpine:3.22
+    volumes:
+      - ${BACKUP_DIRECTORY:?set BACKUP_DIRECTORY}:/backup:ro
+    command: ["tar", "-tzf", "/backup/attachments.tgz"]

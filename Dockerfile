@@ -30,9 +30,13 @@ RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm build
 
 FROM node:22-alpine AS production
 ENV NODE_ENV="production"
+ENV HOSTNAME="0.0.0.0"
+ENV PORT="3000"
 WORKDIR /app
-COPY --from=builder /app/public ./public
+RUN mkdir -p /app/storage
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD node -e "fetch('http://localhost:3000/api/health/ready').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"
 CMD ["node", "server.js"]

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
 import { issueInclude } from "@/lib/issue-query";
 import { toUiIssue } from "@/lib/issue-mapper";
+import { attachmentDownloadUrl } from "@/lib/storage";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -23,7 +24,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   return NextResponse.json({
     comments: comments.map((item) => ({ id: item.id, body: typeof item.body === "string" ? item.body : "", createdAt: item.createdAt, updatedAt: item.updatedAt, author: item.author })),
     activities: activities.map((item) => ({ id: item.id, action: item.action, changes: item.changes, createdAt: item.createdAt, actor: item.actor })),
-    attachments,
+    attachments: attachments.map((item) => ({ ...item, downloadUrl: attachmentDownloadUrl(context.workspace.id, item.id) })),
     subtasks: subtasks.map((item) => toUiIssue(item, scope.project.key)),
   });
 }

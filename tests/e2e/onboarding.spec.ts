@@ -1,6 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+test("liveness and readiness distinguish process and dependency health", async ({ request }) => {
+  await expect((await request.get("/api/health/live")).json()).resolves.toEqual({ status: "ok" });
+  await expect((await request.get("/api/health/ready")).json()).resolves.toEqual({ status: "ready" });
+});
+
 test("new user creates a usable workspace", async ({ page }) => {
   const unique = Date.now();
   await page.goto("/signup");
