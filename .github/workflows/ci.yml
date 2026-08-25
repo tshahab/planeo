@@ -17,10 +17,30 @@ jobs:
   verify:
     name: Docker verification
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Validate, lint, type-check, and build
         run: docker build --target builder --tag planeo-ci:${{ github.sha }} .
+
+      - name: Run unit and integration tests
+        run: docker compose -f compose.test.yaml run --rm tests
+
+      - name: Run browser and accessibility tests
+        run: docker compose -f compose.test.yaml run --rm e2e
+
+      - name: Publish browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+
+      - name: Stop test environment
+        if: always()
+        run: docker compose -f compose.test.yaml down --volumes

@@ -47,3 +47,15 @@ Use `docker compose down -v` only when intentionally deleting the development da
 ## Continuous integration
 
 Every pull request and push to `main` runs a Docker-only verification build in GitHub Actions. The builder target validates the Prisma schema, runs ESLint, type-checks the application, and produces an optimized Next.js production build. The CI workflow installs no project packages directly on the runner host.
+
+## Docker-only tests
+
+The test database uses a disposable PostgreSQL `tmpfs`; fixtures use `test-` tenant slugs and unique user emails so runs are repeatable and isolated. No test command installs packages or writes package caches on the host.
+
+```bash
+docker compose -f compose.test.yaml run --rm tests
+docker compose -f compose.test.yaml run --rm e2e
+docker compose -f compose.test.yaml down --volumes
+```
+
+The first command runs the bounded unit and database integration suite. The second starts the test application automatically and runs Chromium onboarding and accessibility scenarios. Playwright writes concise failure artifacts to `test-results/` and `playwright-report/` for CI publication. Focus a suite with `docker compose -f compose.test.yaml run --rm tests pnpm test:unit` or `pnpm test:integration` after the service name.

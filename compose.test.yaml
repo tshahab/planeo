@@ -1,0 +1,68 @@
+services:
+  test-database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: planeo_test
+      POSTGRES_USER: planeo_test
+      POSTGRES_PASSWORD: planeo_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planeo_test -d planeo_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  tests:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
+      SESSION_SECRET: docker-test-secret-with-at-least-thirty-two-characters
+      NODE_ENV: test
+    depends_on:
+      test-database:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm db:deploy && pnpm test"]
+
+  test-app:
+    build:
+      context: .
+      target: development
+    environment:
+      DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
+      SESSION_SECRET: docker-test-secret-with-at-least-thirty-two-characters
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      test-database:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm db:deploy && pnpm dev --hostname 0.0.0.0"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/login').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    working_dir: /app
+    volumes:
+      - .:/app
+      - e2e_node_modules:/app/node_modules
+      - e2e_pnpm_store:/pnpm/store
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    environment:
+      PLAYWRIGHT_BASE_URL: http://test-app:3000
+      CI: "1"
+      PNPM_HOME: /pnpm
+      npm_config_store_dir: /pnpm/store
+    depends_on:
+      test-app:
+        condition: service_healthy
+    command: ["bash", "-lc", "corepack enable && pnpm install --frozen-lockfile && pnpm test:e2e"]
+
+volumes:
+  e2e_node_modules:
+  e2e_pnpm_store:
