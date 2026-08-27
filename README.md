@@ -59,3 +59,5 @@ docker compose -f compose.test.yaml down --volumes
 ```
 
 The first command runs the bounded unit and database integration suite. The second starts the test application automatically and runs Chromium onboarding and accessibility scenarios. Playwright writes concise failure artifacts to `test-results/` and `playwright-report/` for CI publication. Focus a suite with `docker compose -f compose.test.yaml run --rm tests pnpm test:unit` or `pnpm test:integration` after the service name.
+
+Production-style Docker deployment, probes, structured logging, durable attachment storage, alerts, backup/restore drills, rollback, and maintenance are documented in [docs/security-operations.md](docs/security-operations.md).

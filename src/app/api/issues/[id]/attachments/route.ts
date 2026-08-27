@@ -1,12 +1,11 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
+import { attachmentDownloadUrl, attachmentStorage } from "@/lib/storage";
 
-const storageRoot = "/app/storage";
 const maxBytes = 10 * 1024 * 1024;
 const allowedTypes = new Set(["application/pdf", "application/zip", "application/json", "text/plain", "text/csv"]);
 
@@ -29,18 +28,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const extension = path.extname(file.name).slice(0, 12).replace(/[^.a-zA-Z0-9]/g, "");
   const objectKey = `${context.workspace.id}/${issue.project.id}/${randomUUID()}${extension}`;
-  const absolutePath = path.join(storageRoot, objectKey);
-  await mkdir(path.dirname(absolutePath), { recursive: true });
-  await writeFile(absolutePath, new Uint8Array(await file.arrayBuffer()));
+  await attachmentStorage.put(objectKey, new Uint8Array(await file.arrayBuffer()));
   try {
     const attachment = await db.$transaction(async (tx) => {
       const created = await tx.attachment.create({ data: { issueId: id, fileName: file.name.slice(0, 255), objectKey, contentType: file.type, size: file.size } });
       await tx.issueActivity.create({ data: { issueId: id, actorId: context.user.id, action: "attachment.added", changes: { attachmentId: created.id, fileName: created.fileName } } });
       return created;
     });
-    return NextResponse.json({ attachment: { id: attachment.id, fileName: attachment.fileName, contentType: attachment.contentType, size: attachment.size, createdAt: attachment.createdAt } }, { status: 201 });
+    return NextResponse.json({ attachment: { id: attachment.id, fileName: attachment.fileName, contentType: attachment.contentType, size: attachment.size, createdAt: attachment.createdAt, downloadUrl: attachmentDownloadUrl(context.workspace.id, attachment.id) } }, { status: 201 });
   } catch (cause) {
-    await unlink(absolutePath).catch(() => undefined);
+    await attachmentStorage.delete(objectKey);
     throw cause;
   }
 }

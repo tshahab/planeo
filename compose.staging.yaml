@@ -1,0 +1,62 @@
+name: planeo-staging
+
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: planeo
+      POSTGRES_USER: planeo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - staging_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planeo -d planeo"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+    depends_on:
+      database:
+        condition: service_healthy
+    command: ["pnpm", "db:deploy"]
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: production
+    ports:
+      - "${PLANEO_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      ATTACHMENT_SIGNING_SECRET: ${ATTACHMENT_SIGNING_SECRET:?set ATTACHMENT_SIGNING_SECRET}
+      ATTACHMENT_STORAGE_ROOT: /app/storage
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - staging_attachments:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health/ready').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  smoke:
+    image: node:22-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["node", "-e", "Promise.all(['/api/health/live','/api/health/ready','/login'].map(path => fetch('http://app:3000'+path).then(response => { if (!response.ok) throw new Error(path+' '+response.status) }))).then(() => console.log('staging smoke checks passed'))"]
+
+volumes:
+  staging_database:
+  staging_attachments:

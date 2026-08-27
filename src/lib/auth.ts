@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db } from "./db";
+import { logEvent, requestId } from "./observability";
 
 const COOKIE_NAME = "planeo_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
@@ -92,11 +93,13 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     include: { user: true, workspace: true },
   });
   if (!membership || membership.deactivatedAt) return null;
-  return {
+  const context: AuthContext = {
     user: { id: membership.user.id, email: membership.user.email, name: membership.user.name, avatarUrl: membership.user.avatarUrl, timezone: membership.user.timezone, emailNotifications: membership.user.emailNotifications, inAppNotifications: membership.user.inAppNotifications },
     workspace: { id: membership.workspace.id, name: membership.workspace.name, slug: membership.workspace.slug },
     role: membership.role,
   };
+  logEvent("info", "auth.context_resolved", { requestId: requestId(await headers()), workspaceId: context.workspace.id, userId: context.user.id });
+  return context;
 }
 
 export async function revokeAllSessions(userId: string) { await db.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }); }

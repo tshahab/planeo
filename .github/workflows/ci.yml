@@ -31,6 +31,13 @@ jobs:
       - name: Run browser and accessibility tests
         run: docker compose -f compose.test.yaml run --rm e2e
 
+      - name: Run staging migration and smoke checks
+        env:
+          POSTGRES_PASSWORD: ci-staging-database-secret
+          SESSION_SECRET: ci-session-secret-with-at-least-thirty-two-characters
+          ATTACHMENT_SIGNING_SECRET: ci-attachment-secret-with-at-least-thirty-two-characters
+        run: docker compose -f compose.staging.yaml up --build --abort-on-container-exit --exit-code-from smoke smoke
+
       - name: Publish browser diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -43,4 +50,6 @@ jobs:
 
       - name: Stop test environment
         if: always()
-        run: docker compose -f compose.test.yaml down --volumes
+        run: |
+          docker compose -f compose.test.yaml down --volumes
+          POSTGRES_PASSWORD=cleanup SESSION_SECRET=cleanup-secret-with-at-least-thirty-two-characters ATTACHMENT_SIGNING_SECRET=cleanup-secret-with-at-least-thirty-two-characters docker compose -f compose.staging.yaml down --volumes
