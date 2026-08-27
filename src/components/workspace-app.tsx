@@ -4,7 +4,7 @@ import {
   Bell, ChevronDown, CircleHelp, FolderKanban, Inbox, LayoutDashboard,
   ListFilter, Menu, MoreHorizontal, Plus, Search, Settings, Sparkles, Users, X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Board } from "./board";
@@ -30,6 +30,17 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   const [syncError, setSyncError] = useState<string | null>(null);
   const [view, setView] = useState<"summary" | "board" | "backlog">("summary");
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const createTrigger = useRef<HTMLElement | null>(null);
+
+  function openCreate() {
+    createTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setCreating(true);
+  }
+
+  function closeCreate() {
+    setCreating(false);
+    requestAnimationFrame(() => createTrigger.current?.focus());
+  }
 
   useEffect(() => { const controller = new AbortController(); fetch("/api/notifications?page=1", { signal: controller.signal }).then((response) => response.ok ? response.json() : { unread: 0 }).then((result: { unread: number }) => setUnreadNotifications(result.unread)).catch(() => undefined); return () => controller.abort(); }, []);
 
@@ -102,7 +113,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
       const result = await response.json() as { issue?: Issue; error?: string };
       if (!response.ok || !result.issue) throw new Error(result.error ?? "The issue could not be created.");
       setIssues((current) => [result.issue!, ...current]);
-      setCreating(false);
+      closeCreate();
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : "The issue could not be created.");
     }
@@ -118,7 +129,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
           <button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={18} /></button>
         </div>
 
-        {canWriteProject && <button className="create-button" onClick={() => setCreating(true)}><Plus size={17} /> Create issue <kbd>C</kbd></button>}
+        {canWriteProject && <button className="create-button" onClick={openCreate}><Plus size={17} /> Create issue <kbd>C</kbd></button>}
 
         <nav aria-label="Main navigation">
           <Link href="/" className="nav-item"><LayoutDashboard /> Home</Link>
@@ -151,9 +162,9 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
         <section className="project-header">
           <div className="project-title-row">
             <div><span className="eyebrow">{project.key} PROJECT</span><h1>{project.name}</h1><p>{project.description || "Plan and deliver your team's work."}</p></div>
-            <div className="header-actions"><div className="avatar-stack">{projectPeople.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}{projectPeople.length > 4 && <span className="more-people">+{projectPeople.length - 4}</span>}</div>{canManageProject && <><button className="secondary-button" onClick={() => setManagingMembers(true)}><Users size={16} /> Members</button><Link className="secondary-button" href={`/projects/${project.key}/settings/workflow`}><Settings size={16} /> Workflow</Link></>}{canWriteProject && <button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Create</button>}</div>
+            <div className="header-actions"><div className="avatar-stack">{projectPeople.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}{projectPeople.length > 4 && <span className="more-people">+{projectPeople.length - 4}</span>}</div>{canManageProject && <><button className="secondary-button" onClick={() => setManagingMembers(true)}><Users size={16} /> Members</button><Link className="secondary-button" href={`/projects/${project.key}/settings/workflow`}><Settings size={16} /> Workflow</Link></>}{canWriteProject && <button className="primary-button" onClick={openCreate}><Plus size={17} /> Create</button>}</div>
           </div>
-          <div className="tabs" role="tablist"><button className={view === "summary" ? "active" : ""} onClick={() => setView("summary")}>Summary</button><button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><button>Issues</button></div>
+          <div className="tabs" role="tablist"><button role="tab" aria-selected={view === "summary"} className={view === "summary" ? "active" : ""} onClick={() => setView("summary")}>Summary</button><button role="tab" aria-selected={view === "board"} className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button role="tab" aria-selected={view === "backlog"} className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><button role="tab" aria-selected={false}>Issues</button></div>
         </section>
 
         {view === "board" && <><section className="board-toolbar">
@@ -164,13 +175,13 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
           {project.template === "SCRUM" && activeSprint && <div className="sprint-chip"><Sparkles size={14} /><span>{activeSprint.name}</span>{activeSprint.endsAt && <strong>Ends {new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(activeSprint.endsAt))}</strong>}</div>}
         </section>
 
-        <Board issues={visibleIssues} statuses={statuses} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={() => setCreating(true)} readOnly={!canWriteProject} /></>}
+        <Board issues={visibleIssues} statuses={statuses} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={openCreate} readOnly={!canWriteProject} /></>}
         {view === "summary" && <ProjectSummaryView projectKey={project.key} />}
         {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={setSelectedIssue} />}
       </main>
 
       {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={closeIssue} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} onArchive={canManageProject ? async () => { const response = await fetch(`/api/issues/${selectedIssue.id}/archive`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "archive" }) }); if (!response.ok) throw new Error("Issue could not be archived."); setIssues((current) => current.filter((item) => item.id !== selectedIssue.id)); setSelectedIssue(null); } : undefined} readOnly={!canWriteProject} />}
-      {creating && <CreateIssue project={project} people={projectPeople} issueTypes={issueTypes} statuses={statuses} nextNumber={issues.length + 1} onClose={() => setCreating(false)} onCreate={addIssue} />}
+      {creating && <CreateIssue project={project} people={projectPeople} issueTypes={issueTypes} statuses={statuses} nextNumber={issues.length + 1} onClose={closeCreate} onCreate={addIssue} />}
       {creatingProject && <CreateProject onClose={() => setCreatingProject(false)} />}
       {managingMembers && <ProjectMembers projectKey={project.key} projectName={project.name} onClose={() => setManagingMembers(false)} />}
       {syncError && <div className="sync-error" role="alert"><span>{syncError}</span><button onClick={() => setSyncError(null)} aria-label="Dismiss error"><X size={15} /></button></div>}
