@@ -1,10 +1,13 @@
 "use client";
 
 import { ChevronDown, Paperclip, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Issue, Person, Priority, ProjectIssueType, ProjectStatus, ProjectSummary } from "@/lib/types";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 
 export function CreateIssue({ project, people, issueTypes, statuses, nextNumber, onClose, onCreate }: { project: ProjectSummary; people: Person[]; issueTypes: ProjectIssueType[]; statuses: ProjectStatus[]; nextNumber: number; onClose: () => void; onCreate: (issue: Issue) => void }) {
+  const dialogRef = useRef<HTMLFormElement>(null);
+  useDialogFocus(dialogRef, onClose);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
@@ -20,8 +23,8 @@ export function CreateIssue({ project, people, issueTypes, statuses, nextNumber,
 
   return <div className="modal-layer">
     <button className="modal-scrim" onClick={onClose} aria-label="Close dialog" />
-    <form className="create-modal" onSubmit={submit}>
-      <header><div><span>Create issue in</span><strong><span className="project-icon purple">{project.name[0]}</span> {project.name} <ChevronDown size={14} /></strong></div><button type="button" onClick={onClose} aria-label="Close"><X size={20} /></button></header>
+    <form ref={dialogRef} className="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-issue-title" onSubmit={submit}>
+      <header><div><span>Create issue in</span><strong id="create-issue-title"><span className="project-icon purple">{project.name[0]}</span> {project.name} <ChevronDown size={14} /></strong></div><button type="button" onClick={onClose} aria-label="Close"><X size={20} /></button></header>
       <div className="modal-content">
         <label className="field-label" htmlFor="summary">Summary <b>*</b></label><input id="summary" autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="What needs to be done?" />
         <label className="field-label" htmlFor="description">Description</label><textarea id="description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Add context, acceptance criteria, or useful links…" />
