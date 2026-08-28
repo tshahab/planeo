@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       include: issueInclude,
     });
     const activity = await tx.issueActivity.create({ data: { issueId: created.id, actorId: reporter.id, action: "issue.created" } });
+    await tx.issueHistory.create({ data: { workspaceId: project.workspaceId, projectId: project.id, issueId: created.id, event: "CREATED", statusCategory: status.category, estimate: created.estimate } });
     const base = { workspaceId: project.workspaceId, issueId: created.id, issueKey: `${project.key}-${created.number}`, issueTitle: created.summary, actorId: reporter.id, eventId: activity.id };
     if (created.assigneeId) await createIssueNotifications(tx, { ...base, type: "ASSIGNED", recipientIds: [created.assigneeId] });
     await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });
