@@ -121,6 +121,7 @@ model Workspace {
   invitations   WorkspaceInvitation[]
   savedFilters  SavedFilter[]
   emailDeliveries EmailDelivery[]
+  issueHistory IssueHistory[]
 }
 
 model WorkspaceInvitation {
@@ -207,6 +208,7 @@ model Project {
   workflowTransitions WorkflowTransition[]
   issueImports IssueImport[]
   importedIssues ImportedIssue[]
+  issueHistory IssueHistory[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
 
@@ -310,11 +312,31 @@ model Issue {
   recentViews  RecentIssueView[]
   emailDeliveries EmailDelivery[]
   importRecord ImportedIssue?
+  history IssueHistory[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
+}
+
+model IssueHistory {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  projectId      String
+  issueId        String
+  sprintId       String?
+  event          String
+  statusCategory StatusCategory
+  estimate       Int?
+  occurredAt     DateTime @default(now())
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issue          Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, occurredAt])
+  @@index([sprintId, occurredAt])
+  @@index([issueId, occurredAt])
 }
 
 model IssueImport {

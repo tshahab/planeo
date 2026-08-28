@@ -106,6 +106,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const activity = await tx.issueActivity.create({
       data: { issueId: id, actorId: context.user.id, action: data.statusId && Object.keys(changes).length === 1 ? "issue.status_changed" : "issue.updated", changes: JSON.parse(JSON.stringify(changes)) as Prisma.InputJsonValue },
     });
+    if (data.statusId !== undefined || data.estimate !== undefined) await tx.issueHistory.create({ data: { workspaceId: project.workspaceId, projectId: project.id, issueId: id, event: data.statusId !== undefined ? "STATUS_CHANGED" : "ESTIMATE_CHANGED", statusCategory: updated.status.category, estimate: updated.estimate } });
     const base = { workspaceId: project.workspaceId, issueId: id, issueKey: `${project.key}-${existing.number}`, issueTitle: data.summary ?? existing.summary, actorId: context.user.id, eventId: activity.id };
     if (data.assigneeId && data.assigneeId !== existing.assigneeId) await createIssueNotifications(tx, { ...base, type: "ASSIGNED", recipientIds: [data.assigneeId] });
     await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });

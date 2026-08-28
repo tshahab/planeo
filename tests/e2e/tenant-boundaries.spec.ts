@@ -63,6 +63,9 @@ test("workspace boundaries protect reads, writes, attachments, search, notificat
   const dashboard = await api(beta.page, "/api/projects/FIRST/summary");
   expect(dashboard.status).toBe(200);
   expect((dashboard.body as { statuses: Array<{ issueCount: number }> }).statuses.reduce((sum, status) => sum + status.issueCount, 0)).toBe(0);
+  const reports = await api(beta.page, "/api/projects/FIRST/reports");
+  expect(reports.status).toBe(200);
+  expect((reports.body as { cumulativeFlow: Array<{ total: number }> }).cumulativeFlow.at(-1)?.total).toBe(0);
 
   await alpha.context.close();
   await beta.context.close();
