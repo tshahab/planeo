@@ -53,5 +53,12 @@ export interface SprintSummary {
   completedAt?: string;
   totalIssueCount?: number;
   completedIssueCount?: number;
+  totalEstimate?: number;
+  completedEstimate?: number;
+  capacityTarget?: number;
+  position: number;
+  version: number;
+  issueCount?: number;
+  estimateTotal?: number;
   issues: Issue[];
 }

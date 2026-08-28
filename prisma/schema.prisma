@@ -483,12 +483,18 @@ model Sprint {
   completedAt         DateTime?
   totalIssueCount     Int?
   completedIssueCount Int?
+  totalEstimate       Int?
+  completedEstimate   Int?
+  capacityTarget      Int?
+  position            Int           @default(0)
+  version             Int           @default(1)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   project             Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues              SprintIssue[]
+  snapshotIssues      SprintSnapshotIssue[]
 
-  @@index([projectId, state])
+  @@index([projectId, state, position])
 }
 
 model SprintIssue {
@@ -502,6 +508,20 @@ model SprintIssue {
   @@id([sprintId, issueId])
   @@index([sprintId, position])
   @@index([issueId])
+}
+
+model SprintSnapshotIssue {
+  sprintId    String
+  issueId     String
+  issueKey    String
+  summary     String
+  estimate    Int?
+  completed   Boolean
+  completedAt DateTime?
+  sprint      Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  @@id([sprintId, issueId])
+  @@index([sprintId, completed])
 }
 
 model Notification {

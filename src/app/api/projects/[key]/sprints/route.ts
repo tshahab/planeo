@@ -13,7 +13,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ key: strin
     db.sprint.findMany({
       where: { projectId: project.id },
       include: { issues: { orderBy: { position: "asc" }, include: { issue: { include: issueInclude } } } },
-      orderBy: [{ state: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ state: "asc" }, { position: "asc" }],
     }),
     db.issue.findMany({
       where: { projectId: project.id, parentId: null, archivedAt: null, sprintIssues: { none: { sprint: { state: { in: ["PLANNED", "ACTIVE"] } } } } },
@@ -21,9 +21,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ key: strin
       orderBy: { rank: "asc" },
     }),
   ]);
+  const wipLimits = await db.boardColumn.findMany({ where: { board: { projectId: project.id }, wipLimit: { not: null } }, select: { name: true, wipLimit: true, status: { select: { _count: { select: { issues: { where: { archivedAt: null } } } } } } } });
   return NextResponse.json({
     backlog: backlog.map((issue) => toUiIssue(issue, project.key)),
-    sprints: sprints.map((sprint) => ({ ...sprint, issues: sprint.issues.map(({ issue }) => toUiIssue(issue, project.key)) })),
+    sprints: sprints.map((sprint) => ({ ...sprint, issueCount: sprint.issues.length, estimateTotal: sprint.issues.reduce((sum, { issue }) => sum + (issue.estimate ?? 0), 0), issues: sprint.issues.map(({ issue }) => toUiIssue(issue, project.key)) })),
+    wipLimits: wipLimits.map((column) => ({ name: column.name, limit: column.wipLimit, count: column.status._count.issues })),
   });
 }
 
@@ -35,10 +37,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
   const project = await getProjectForContext(context, key);
   const member = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } } });
   if (member?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot create sprints." }, { status: 403 });
-  const body = await request.json().catch(() => null) as { name?: unknown; goal?: unknown } | null;
+  const body = await request.json().catch(() => null) as { name?: unknown; goal?: unknown; startsAt?: unknown; endsAt?: unknown; capacityTarget?: unknown } | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const goal = typeof body?.goal === "string" ? body.goal.trim() : "";
   if (!name || name.length > 100 || goal.length > 500) return NextResponse.json({ error: "Use a sprint name of 1–100 characters and a goal of at most 500 characters." }, { status: 400 });
-  const sprint = await db.sprint.create({ data: { projectId: project.id, name, goal: goal || null } });
+  const startsAt = date(body?.startsAt); const endsAt = date(body?.endsAt); const capacityTarget = integer(body?.capacityTarget, 0, 10000);
+  if (body?.startsAt && !startsAt || body?.endsAt && !endsAt || body?.capacityTarget != null && capacityTarget == null || startsAt && endsAt && startsAt >= endsAt) return NextResponse.json({ error: "Dates or capacity target are invalid." }, { status: 400 });
+  const last = await db.sprint.aggregate({ where: { projectId: project.id, state: "PLANNED" }, _max: { position: true } });
+  const sprint = await db.sprint.create({ data: { projectId: project.id, name, goal: goal || null, startsAt, endsAt, capacityTarget, position: (last._max.position ?? -1) + 1 } });
   return NextResponse.json({ sprint: { ...sprint, issues: [] } }, { status: 201 });
 }
+
+function date(value: unknown) { if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null; const result = new Date(`${value}T12:00:00.000Z`); return Number.isNaN(result.getTime()) ? null : result; }
+function integer(value: unknown, min: number, max: number) { if (value === undefined || value === null || value === "") return null; const result = Number(value); return Number.isInteger(result) && result >= min && result <= max ? result : null; }
