@@ -82,6 +82,13 @@ enum EmailDeliveryStatus {
   DEAD
 }
 
+enum WebhookDeliveryStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  DEAD
+}
+
 model User {
   id             String            @id @default(cuid())
   email          String            @unique
@@ -109,6 +116,7 @@ model User {
   ledProjects    Project[]         @relation("ProjectLead")
   defaultProjects Project[]        @relation("ProjectDefaultAssignee")
   emailDeliveries EmailDelivery[]
+  apiTokens ApiToken[]
 }
 
 model Workspace {
@@ -127,6 +135,8 @@ model Workspace {
   savedFilters  SavedFilter[]
   emailDeliveries EmailDelivery[]
   issueHistory IssueHistory[]
+  apiTokens ApiToken[]
+  webhookSubscriptions WebhookSubscription[]
 }
 
 model WorkspaceInvitation {
@@ -215,6 +225,7 @@ model Project {
   importedIssues ImportedIssue[]
   issueHistory IssueHistory[]
   releases Release[]
+  webhookSubscriptions WebhookSubscription[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
 
@@ -657,4 +668,78 @@ model AuditEvent {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
+}
+
+model ApiToken {
+  id          String   @id @default(cuid())
+  workspaceId String
+  createdById String
+  name        String
+  prefix      String   @unique
+  secretHash  String   @unique
+  scopes      String[]
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  idempotencyRecords ApiIdempotency[]
+
+  @@index([workspaceId, revokedAt, createdAt])
+}
+
+model ApiIdempotency {
+  tokenId    String
+  key        String
+  route      String
+  statusCode Int
+  response   Json
+  createdAt  DateTime @default(now())
+  token      ApiToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@id([tokenId, key, route])
+  @@index([createdAt])
+}
+
+model WebhookSubscription {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  projectId       String?
+  name            String
+  url             String
+  events          String[]
+  secretHash      String
+  encryptedSecret String
+  enabled         Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliveries      WebhookDelivery[]
+
+  @@index([workspaceId, enabled])
+  @@index([projectId])
+}
+
+model WebhookDelivery {
+  id             String @id @default(cuid())
+  subscriptionId String
+  eventId        String
+  event          String
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int @default(0)
+  availableAt    DateTime @default(now())
+  lockedAt       DateTime?
+  deliveredAt    DateTime?
+  responseStatus Int?
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, eventId])
+  @@index([status, availableAt])
+  @@index([subscriptionId, createdAt])
 }

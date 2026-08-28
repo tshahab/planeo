@@ -48,6 +48,18 @@ services:
       - ./ops/mail-capture.mjs:/app/mail-capture.mjs:ro
     command: ["node", "/app/mail-capture.mjs"]
 
+  webhook-worker-test:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
+      SESSION_SECRET: docker-test-secret-with-at-least-thirty-two-characters
+    depends_on:
+      test-database:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm db:deploy && pnpm webhook:worker"]
+
   test-app:
     build:
       context: .
@@ -56,6 +68,7 @@ services:
       DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
       SESSION_SECRET: docker-test-secret-with-at-least-thirty-two-characters
       NEXT_TELEMETRY_DISABLED: "1"
+      IDENTITY_RATE_LIMIT: "30"
     depends_on:
       test-database:
         condition: service_healthy
