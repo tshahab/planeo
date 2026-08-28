@@ -56,6 +56,11 @@ enum SprintState {
   COMPLETED
 }
 
+enum ReleaseStatus {
+  PLANNED
+  RELEASED
+}
+
 enum NotificationType {
   ASSIGNED
   MENTIONED
@@ -209,6 +214,7 @@ model Project {
   issueImports IssueImport[]
   importedIssues ImportedIssue[]
   issueHistory IssueHistory[]
+  releases Release[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
 
@@ -313,11 +319,43 @@ model Issue {
   emailDeliveries EmailDelivery[]
   importRecord ImportedIssue?
   history IssueHistory[]
+  releases IssueRelease[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
+}
+
+model Release {
+  id          String        @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  status      ReleaseStatus @default(PLANNED)
+  startsAt    DateTime?
+  releaseDate DateTime?
+  releasedAt  DateTime?
+  archivedAt  DateTime?
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues      IssueRelease[]
+
+  @@unique([projectId, name])
+  @@index([projectId, archivedAt, releaseDate])
+}
+
+model IssueRelease {
+  releaseId String
+  issueId   String
+  addedAt   DateTime @default(now())
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  issue     Issue     @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@id([releaseId, issueId])
+  @@index([issueId])
 }
 
 model IssueHistory {

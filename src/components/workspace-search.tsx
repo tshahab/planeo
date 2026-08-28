@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Issue } from "@/lib/types";
 
-type Filters = { projects: Array<{ id: string; key: string; name: string; statuses: Array<{ id: string; name: string }>; issueTypes: Array<{ id: string; name: string }> }>; members: Array<{ id: string; name: string }>; labels: Array<{ id: string; name: string }>; sprints: Array<{ id: string; name: string; projectId: string }> };
+type Filters = { projects: Array<{ id: string; key: string; name: string; statuses: Array<{ id: string; name: string }>; issueTypes: Array<{ id: string; name: string }> }>; members: Array<{ id: string; name: string }>; labels: Array<{ id: string; name: string }>; sprints: Array<{ id: string; name: string; projectId: string }>; releases: Array<{ id: string; name: string; projectId: string; archivedAt?: string }> };
 type Payload = { results: Array<Issue & { projectName: string }>; total: number; page: number; pageSize: number; filters: Filters; error?: string };
 type SavedFilter = { id: string; name: string; query: Record<string, string>; shared: boolean; ownerId: string; owner: { name: string } };
 
@@ -68,6 +68,7 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
         <Filter label="Priority" value={searchParams.get("priority") ?? ""} onChange={(value) => update("priority", value)} options={[["URGENT", "Urgent"], ["HIGH", "High"], ["MEDIUM", "Medium"], ["LOW", "Low"]]} />
         <Filter label="Label" value={searchParams.get("label") ?? ""} onChange={(value) => update("label", value)} options={data?.filters.labels.map((item) => [item.id, item.name]) ?? []} />
         <Filter label="Sprint" value={searchParams.get("sprint") ?? ""} onChange={(value) => update("sprint", value)} options={data?.filters.sprints.map((item) => [item.id, item.name]) ?? []} />
+        <Filter label="Release" value={searchParams.get("release") ?? ""} onChange={(value) => update("release", value)} options={data?.filters.releases.map((item) => [item.id, `${item.name}${item.archivedAt ? " (archived)" : ""}`]) ?? []} />
         <label>Created from<input type="date" value={searchParams.get("from") ?? ""} onChange={(event) => update("from", event.target.value)} /></label>
         <label>Created to<input type="date" value={searchParams.get("to") ?? ""} onChange={(event) => update("to", event.target.value)} /></label>
         <Filter label="Sort" value={searchParams.get("sort") ?? "updated"} onChange={(value) => update("sort", value)} allLabel="Updated" options={[["created", "Created"], ["priority", "Priority"], ["due", "Due date"], ["rank", "Rank"]]} />

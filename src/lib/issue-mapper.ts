@@ -9,6 +9,7 @@ type IssueRecord = PrismaIssue & {
   labels: { label: { name: string } }[];
   _count: { comments: number; attachments: number };
   sprintIssues: { sprint: { id: string; name: string } }[];
+  releases: { release: { id:string; name:string; status:"PLANNED"|"RELEASED"; archivedAt:Date|null; releasedAt:Date|null } }[];
 };
 
 const priorities: Record<string, Priority> = {
@@ -38,6 +39,7 @@ export function toUiIssue(issue: IssueRecord, projectKey: string): Issue {
     attachments: issue._count.attachments,
     reporter: { id: issue.reporter.id, name: issue.reporter.name, initials: issue.reporter.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(), color: avatarColor(issue.reporter.id) },
     sprint: issue.sprintIssues[0]?.sprint,
+    releases: issue.releases.map(({release})=>({id:release.id,name:release.name,status:release.status,archived:Boolean(release.archivedAt),releasedAt:release.releasedAt?.toISOString()})),
     createdAt: issue.createdAt.toISOString(),
     updatedAt: issue.updatedAt.toISOString(),
   };

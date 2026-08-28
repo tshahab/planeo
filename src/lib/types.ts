@@ -30,6 +30,7 @@ export interface Issue {
   attachments: number;
   reporter?: Person;
   sprint?: { id: string; name: string };
+  releases?: Array<{id:string;name:string;status:"PLANNED"|"RELEASED";archived:boolean;releasedAt?:string}>;
   createdAt?: string;
   updatedAt?: string;
 }

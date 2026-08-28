@@ -9,10 +9,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ key: strin
   const { key } = await params;
   const project = await getProjectForContext(context, key).catch(() => null);
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
-  const [statuses, grouped, sprint] = await Promise.all([
+  const [statuses, grouped, sprint, releases] = await Promise.all([
     db.status.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" }, select: { id: true, name: true, color: true, category: true } }),
     db.issue.groupBy({ by: ["statusId"], where: { projectId: project.id, workspaceId: context.workspace.id, archivedAt: null, parentId: null }, _count: { _all: true }, _sum: { estimate: true } }),
     db.sprint.findFirst({ where: { projectId: project.id, state: "ACTIVE" }, orderBy: { startsAt: "desc" }, include: { issues: { where: { issue: { archivedAt: null } }, include: { issue: { select: { estimate: true, status: { select: { category: true } } } } } } } }),
+    db.release.findMany({ where: { projectId: project.id, archivedAt: null, status: "PLANNED" }, orderBy: { releaseDate: { sort: "asc", nulls: "last" } }, take: 5, include: { issues: { where: { issue: { archivedAt: null } }, include: { issue: { select: { estimate: true, status: { select: { category: true } } } } } } } }),
   ]);
   const counts = new Map(grouped.map((item) => [item.statusId, item]));
   const sprintIssues = sprint?.issues ?? [];
@@ -25,5 +26,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ key: strin
       estimateTotal: sprintIssues.reduce((sum, { issue }) => sum + (issue.estimate ?? 0), 0),
       completedEstimate: sprintIssues.filter(({ issue }) => issue.status.category === "DONE").reduce((sum, { issue }) => sum + (issue.estimate ?? 0), 0),
     } : null,
+    releases: releases.map((release) => ({ id: release.id, name: release.name, releaseDate: release.releaseDate, issueCount: release.issues.length, unresolvedCount: release.issues.filter(({ issue }) => issue.status.category !== "DONE").length, estimateTotal: release.issues.reduce((sum, { issue }) => sum + (issue.estimate ?? 0), 0) })),
   });
 }

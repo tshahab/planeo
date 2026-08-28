@@ -7,6 +7,7 @@ export const issueInclude = {
   issueType: true,
   status: true,
   sprintIssues: { include: { sprint: { select: { id: true, name: true } } }, orderBy: { addedAt: "desc" as const }, take: 1 },
+  releases: { include: { release: { select: { id: true, name: true, status: true, archivedAt: true, releasedAt: true } } }, orderBy: { addedAt: "asc" as const } },
   labels: { include: { label: true } },
   _count: { select: { comments: true, attachments: true } },
 } as const;
