@@ -26,6 +26,28 @@ services:
         condition: service_healthy
     command: ["sh", "-c", "pnpm db:deploy && pnpm test"]
 
+  email-worker-test:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
+      EMAIL_PROVIDER_URL: http://mail-capture-test:8025/messages
+      EMAIL_POLL_MS: "100"
+    depends_on:
+      test-database:
+        condition: service_healthy
+      mail-capture-test:
+        condition: service_started
+    command: ["sh", "-c", "pnpm db:deploy && pnpm email:worker"]
+
+  mail-capture-test:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./ops/mail-capture.mjs:/app/mail-capture.mjs:ro
+    command: ["node", "/app/mail-capture.mjs"]
+
   test-app:
     build:
       context: .
