@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext, issueInclude } from "@/lib/issue-query";
 import { toUiIssue } from "@/lib/issue-mapper";
+import { enqueueWebhook } from "@/lib/webhooks";
 
 export async function GET(_: Request, { params }: { params: Promise<{ key: string }> }) {
   const context = await getAuthContext();
@@ -44,7 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
   const startsAt = date(body?.startsAt); const endsAt = date(body?.endsAt); const capacityTarget = integer(body?.capacityTarget, 0, 10000);
   if (body?.startsAt && !startsAt || body?.endsAt && !endsAt || body?.capacityTarget != null && capacityTarget == null || startsAt && endsAt && startsAt >= endsAt) return NextResponse.json({ error: "Dates or capacity target are invalid." }, { status: 400 });
   const last = await db.sprint.aggregate({ where: { projectId: project.id, state: "PLANNED" }, _max: { position: true } });
-  const sprint = await db.sprint.create({ data: { projectId: project.id, name, goal: goal || null, startsAt, endsAt, capacityTarget, position: (last._max.position ?? -1) + 1 } });
+  const sprint = await db.$transaction(async tx => { const value = await tx.sprint.create({ data: { projectId: project.id, name, goal: goal || null, startsAt, endsAt, capacityTarget, position: (last._max.position ?? -1) + 1 } }); await enqueueWebhook(tx, { workspaceId: context.workspace.id, projectId: project.id, event: "sprint.created", eventId: `sprint.created:${value.id}`, data: { id: value.id, name: value.name, version: value.version } }); return value; });
   return NextResponse.json({ sprint: { ...sprint, issues: [] } }, { status: 201 });
 }
 

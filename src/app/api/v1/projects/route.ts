@@ -1,0 +1,2 @@
+import { authenticateApi,page,pagination,tokenProjectWhere } from "@/lib/api-auth";import { db } from "@/lib/db";
+export async function GET(request:Request){const auth=await authenticateApi(request,"projects:read");if(auth.error)return auth.error;const {limit,cursor}=pagination(request);const items=await db.project.findMany({where:tokenProjectWhere(auth),orderBy:{id:"asc"},take:limit+1,...(cursor?{cursor:{id:cursor},skip:1}:{}),select:{id:true,key:true,name:true,description:true,visibility:true,template:true,updatedAt:true}});return Response.json(page(items,limit))}

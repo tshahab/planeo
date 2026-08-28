@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
   if (!writeMethods.has(request.method)) return NextResponse.next({ request: { headers: requestHeaders }, headers: { "X-Request-Id": correlationId } });
   const client = requestClientKey(request);
   const isIdentity = request.nextUrl.pathname.startsWith("/api/auth/") && request.nextUrl.pathname !== "/api/auth/logout";
-  const limit = await consumeRateLimit(`${isIdentity ? "identity" : "write"}:${client}`, isIdentity ? 10 : 120, isIdentity ? 15 * 60 : 60);
+  const identityLimit = Number(process.env.IDENTITY_RATE_LIMIT ?? 10);
+  const limit = await consumeRateLimit(`${isIdentity ? "identity" : "write"}:${client}`, isIdentity ? identityLimit : 120, isIdentity ? 15 * 60 : 60);
   if (!limit.allowed) {
     logEvent("warn", "request.rate_limited", { requestId: correlationId, path: request.nextUrl.pathname, method: request.method });
     return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429, headers: { "Retry-After": String(Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000))), "X-Request-Id": correlationId } });

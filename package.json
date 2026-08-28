@@ -19,7 +19,8 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "maintenance": "node ops/maintenance.mjs",
-    "email:worker": "node ops/email-worker.mjs"
+    "email:worker": "node ops/email-worker.mjs",
+    "webhook:worker": "node ops/webhook-worker.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.9.1",

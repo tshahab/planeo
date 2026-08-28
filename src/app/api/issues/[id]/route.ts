@@ -5,6 +5,7 @@ import { toUiIssue } from "@/lib/issue-mapper";
 import { getProjectForContext, issueInclude } from "@/lib/issue-query";
 import type { Prisma } from "@prisma/client";
 import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
+import { enqueueWebhook } from "@/lib/webhooks";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -111,6 +112,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (data.assigneeId && data.assigneeId !== existing.assigneeId) await createIssueNotifications(tx, { ...base, type: "ASSIGNED", recipientIds: [data.assigneeId] });
     await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });
     await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: existing.watchers.map(({ userId }) => userId) });
+    await enqueueWebhook(tx, { workspaceId: project.workspaceId, projectId: project.id, event: "issue.updated", eventId: `issue.updated:${id}:${updated.version}`, data: { id, key: `${project.key}-${existing.number}`, version: updated.version } });
     return updated;
   });
   return NextResponse.json({ issue: toUiIssue(issue, project.key) });

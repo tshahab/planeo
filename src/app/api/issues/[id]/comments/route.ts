@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
 import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
+import { enqueueWebhook } from "@/lib/webhooks";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -25,6 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const base = { workspaceId: context.workspace.id, issueId: id, issueKey: `${scope.project.key}-${scope.number}`, issueTitle: scope.summary, actorId: context.user.id, eventId: created.id };
     await createIssueNotifications(tx, { ...base, type: "COMMENTED", recipientIds: [...scope.watchers.map(({ userId }) => userId), ...(scope.assigneeId ? [scope.assigneeId] : [])] });
     await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentioned.map(({ id: userId }) => userId) });
+    await enqueueWebhook(tx, { workspaceId: context.workspace.id, projectId: project.id, event: "comment.created", eventId: `comment.created:${created.id}`, data: { id: created.id, issueId: id, issueKey: `${scope.project.key}-${scope.number}` } });
     return created;
   });
   return NextResponse.json({ comment: { id: comment.id, body: text, createdAt: comment.createdAt, updatedAt: comment.updatedAt, author: comment.author } }, { status: 201 });

@@ -1,0 +1,42 @@
+openapi: 3.1.0
+info:
+  title: Planeo Public API
+  version: 1.0.0
+  description: Stable v1 contract. Breaking changes require a new URL version; additive fields may be introduced in v1.
+servers:
+  - url: /api/v1
+security:
+  - bearerToken: []
+components:
+  securitySchemes:
+    bearerToken: { type: http, scheme: bearer }
+  parameters:
+    Cursor: { name: cursor, in: query, schema: { type: string } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 128 } }
+paths:
+  /projects:
+    get: { summary: List accessible projects, responses: { '200': { description: Cursor page } } }
+  /projects/{key}:
+    get: { summary: Get a project, parameters: [{ name: key, in: path, required: true, schema: { type: string } }], responses: { '200': { description: Project } } }
+  /issues:
+    get: { summary: List issues, responses: { '200': { description: Cursor page } } }
+    post: { summary: Create an issue, parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }], responses: { '201': { description: Created } } }
+  /issues/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get: { summary: Get an issue, responses: { '200': { description: Issue } } }
+    patch: { summary: Update an issue with its current version, responses: { '200': { description: Updated }, '409': { description: Version conflict } } }
+  /issues/{id}/comments:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get: { summary: List comments, responses: { '200': { description: Cursor page } } }
+    post: { summary: Create a comment, parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }], responses: { '201': { description: Created } } }
+  /projects/{key}/sprints:
+    parameters: [{ name: key, in: path, required: true, schema: { type: string } }]
+    get: { summary: List sprints, responses: { '200': { description: Cursor page } } }
+    post: { summary: Create a sprint, responses: { '201': { description: Created } } }
+  /projects/{key}/releases:
+    parameters: [{ name: key, in: path, required: true, schema: { type: string } }]
+    get: { summary: List releases including archived history, responses: { '200': { description: Cursor page } } }
+    post: { summary: Create a release, responses: { '201': { description: Created } } }
+  /users:
+    get: { summary: List active workspace users, responses: { '200': { description: Cursor page } } }

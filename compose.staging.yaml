@@ -64,6 +64,19 @@ services:
     command: ["pnpm", "email:worker"]
     restart: unless-stopped
 
+  webhook-worker:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["pnpm", "webhook:worker"]
+    restart: unless-stopped
+
   smoke:
     image: node:22-alpine
     depends_on:
