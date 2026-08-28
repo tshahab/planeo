@@ -205,6 +205,8 @@ model Project {
   sprints       Sprint[]
   invitations   WorkspaceInvitation[]
   workflowTransitions WorkflowTransition[]
+  issueImports IssueImport[]
+  importedIssues ImportedIssue[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
 
@@ -307,11 +309,37 @@ model Issue {
   notifications Notification[]
   recentViews  RecentIssueView[]
   emailDeliveries EmailDelivery[]
+  importRecord ImportedIssue?
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
+}
+
+model IssueImport {
+  id             String   @id @default(cuid())
+  projectId      String
+  idempotencyKey String
+  rowCount       Int
+  createdById    String
+  createdAt      DateTime @default(now())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, createdAt])
+}
+
+model ImportedIssue {
+  projectId  String
+  externalId String
+  issueId    String @unique
+  importId   String
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issue      Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, externalId])
+  @@index([importId])
 }
 
 model EmailDelivery {
