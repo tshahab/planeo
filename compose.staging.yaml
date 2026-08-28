@@ -50,6 +50,20 @@ services:
       timeout: 3s
       retries: 30
 
+  email-worker:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+      EMAIL_PROVIDER_URL: ${EMAIL_PROVIDER_URL:-http://mail-capture:8025/messages}
+      APP_URL: ${APP_URL:-http://app:3000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["pnpm", "email:worker"]
+    restart: unless-stopped
+
   smoke:
     image: node:22-alpine
     depends_on:

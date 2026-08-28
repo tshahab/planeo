@@ -70,6 +70,13 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum EmailDeliveryStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  DEAD
+}
+
 model User {
   id             String            @id @default(cuid())
   email          String            @unique
@@ -96,6 +103,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   ledProjects    Project[]         @relation("ProjectLead")
   defaultProjects Project[]        @relation("ProjectDefaultAssignee")
+  emailDeliveries EmailDelivery[]
 }
 
 model Workspace {
@@ -112,6 +120,7 @@ model Workspace {
   auditEvents   AuditEvent[]
   invitations   WorkspaceInvitation[]
   savedFilters  SavedFilter[]
+  emailDeliveries EmailDelivery[]
 }
 
 model WorkspaceInvitation {
@@ -297,11 +306,40 @@ model Issue {
   watchers     IssueWatcher[]
   notifications Notification[]
   recentViews  RecentIssueView[]
+  emailDeliveries EmailDelivery[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
+}
+
+model EmailDelivery {
+  id            String              @id @default(cuid())
+  workspaceId   String?
+  userId        String?
+  issueId       String?
+  category      String
+  recipient     String
+  subject       String
+  textBody      String
+  htmlBody      String
+  dedupeKey     String              @unique
+  correlationId String
+  status        EmailDeliveryStatus @default(PENDING)
+  attempts      Int                 @default(0)
+  availableAt   DateTime            @default(now())
+  lockedAt      DateTime?
+  deliveredAt   DateTime?
+  lastError     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  workspace     Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user          User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue         Issue?              @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([correlationId])
 }
 
 model Label {

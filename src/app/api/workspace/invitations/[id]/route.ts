@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { enqueueEmail } from "@/lib/email";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -20,8 +21,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await db.workspaceInvitation.update({ where: { id }, data: { tokenHash, expiresAt } });
-    await db.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "workspace.invitation_resent", targetType: "invitation", targetId: id, metadata: {} } });
+    await db.$transaction(async (tx) => { await tx.workspaceInvitation.update({ where: { id }, data: { tokenHash, expiresAt } });
+    await tx.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "workspace.invitation_resent", targetType: "invitation", targetId: id, metadata: {} } });
+    await enqueueEmail(tx, { workspaceId: context.workspace.id, category: "INVITATION", recipient: invitation.email, subject: `Join ${context.workspace.name} on Planeo`, message: `${context.user.name} renewed your invitation. This link expires in 7 days.`, actionLabel: "Accept invitation", actionPath: `/invitations/${token}`, dedupeKey: `invitation:${id}:${tokenHash}`, correlationId: id }); });
     return NextResponse.json({ expiresAt, ...(process.env.NODE_ENV !== "production" ? { acceptPath: `/invitations/${token}` } : {}) });
   }
   return NextResponse.json({ error: "Invalid invitation action." }, { status: 400 });

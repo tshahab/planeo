@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
+import { enqueueEmail } from "@/lib/email";
 
 const roles = ["ADMIN", "MEMBER", "VIEWER"] as const;
 type ProjectRoleValue = typeof roles[number];
@@ -56,10 +57,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
   const token = randomBytes(32).toString("base64url");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const invitation = existing
-    ? await db.workspaceInvitation.update({ where: { id: existing.id }, data: { projectRole: role, tokenHash, expiresAt } })
-    : await db.workspaceInvitation.create({ data: { workspaceId: context.workspace.id, projectId: project.id, email, projectRole: role, tokenHash, invitedById: context.user.id, expiresAt } });
-  await db.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "project.invitation_created", targetType: "invitation", targetId: invitation.id, metadata: { projectId: project.id, email, role } } });
+  const invitation = await db.$transaction(async (tx) => { const value = existing
+    ? await tx.workspaceInvitation.update({ where: { id: existing.id }, data: { projectRole: role, tokenHash, expiresAt } })
+    : await tx.workspaceInvitation.create({ data: { workspaceId: context.workspace.id, projectId: project.id, email, projectRole: role, tokenHash, invitedById: context.user.id, expiresAt } });
+    await tx.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "project.invitation_created", targetType: "invitation", targetId: value.id, metadata: { projectId: project.id, email, role } } });
+    await enqueueEmail(tx, { workspaceId: context.workspace.id, category: "INVITATION", recipient: email, subject: `Join ${context.workspace.name} on Planeo`, message: `${context.user.name} invited you to the ${project.name} project. This invitation expires in 7 days.`, actionLabel: "Accept invitation", actionPath: `/invitations/${token}`, dedupeKey: `invitation:${value.id}:${tokenHash}`, correlationId: value.id }); return value; });
   return NextResponse.json({ invitation: { id: invitation.id, email, projectRole: role, expiresAt, acceptPath: `/invitations/${token}` } }, { status: 202 });
 }
 
