@@ -41,21 +41,23 @@ export async function GET(request: Request) {
     ...(priority ? { priority } : {}),
     ...(params.get("label") ? { labels: { some: { labelId: params.get("label")! } } } : {}),
     ...(params.get("sprint") ? { sprintIssues: { some: { sprintId: params.get("sprint")! } } } : {}),
+    ...(params.get("release") ? { releases: { some: { releaseId: params.get("release")! } } } : {}),
     ...(params.get("overdue") === "true" ? { dueDate: { lt: new Date() }, status: { category: { not: "DONE" } } } : {}),
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
   };
   const orderBy: Prisma.IssueOrderByWithRelationInput[] = sort === "created" ? [{ createdAt: "desc" }] : sort === "priority" ? [{ priority: "asc" }, { updatedAt: "desc" }] : sort === "due" ? [{ dueDate: { sort: "asc", nulls: "last" } }] : sort === "rank" ? [{ rank: "asc" }] : [{ updatedAt: "desc" }];
-  const [total, records, projects, members, labels, sprints] = await Promise.all([
+  const [total, records, projects, members, labels, sprints, releases] = await Promise.all([
     db.issue.count({ where }),
     db.issue.findMany({ where, include: { ...issueInclude, project: { select: { key: true, name: true } } }, orderBy, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
     db.project.findMany({ where: accessibleProjectWhere(context), orderBy: { name: "asc" }, select: { id: true, key: true, name: true, statuses: { orderBy: { position: "asc" }, select: { id: true, name: true } }, issueTypes: { orderBy: { position: "asc" }, select: { id: true, name: true } } } }),
     db.workspaceMember.findMany({ where: { workspaceId: context.workspace.id }, orderBy: { user: { name: "asc" } }, select: { user: { select: { id: true, name: true } } } }),
     db.label.findMany({ where: { workspaceId: context.workspace.id }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.sprint.findMany({ where: { project: accessibleProjectWhere(context), state: { in: ["PLANNED", "ACTIVE"] } }, orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, projectId: true } }),
+    db.release.findMany({ where: { project: accessibleProjectWhere(context) }, orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, projectId: true, archivedAt: true } }),
   ]);
   const results = records.map((record) => ({ ...toUiIssue(record, record.project.key), projectName: record.project.name }));
   if (exactKey) results.sort((a, b) => Number(b.key.toUpperCase() === query.toUpperCase()) - Number(a.key.toUpperCase() === query.toUpperCase()));
-  return NextResponse.json({ results, total, page, pageSize: PAGE_SIZE, filters: { projects, members: members.map(({ user }) => user), labels, sprints } });
+  return NextResponse.json({ results, total, page, pageSize: PAGE_SIZE, filters: { projects, members: members.map(({ user }) => user), labels, sprints, releases } });
 }
 
 function positiveInt(value: string | null, fallback: number) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000 ? parsed : fallback; }

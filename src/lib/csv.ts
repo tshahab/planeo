@@ -1,4 +1,4 @@
-export const ISSUE_CSV_COLUMNS = ["externalId", "summary", "description", "type", "status", "priority", "assigneeEmail", "labels", "estimate", "dueDate", "parentExternalId", "links"] as const;
+export const ISSUE_CSV_COLUMNS = ["externalId", "summary", "description", "type", "status", "priority", "assigneeEmail", "labels", "estimate", "dueDate", "parentExternalId", "links", "releases"] as const;
 export type IssueCsvRow = Record<typeof ISSUE_CSV_COLUMNS[number], string>;
 
 export function parseCsv(input: string, maxRows = 5000): { rows: IssueCsvRow[]; errors: { row: number; field: string; message: string }[] } {
