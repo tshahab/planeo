@@ -20,6 +20,9 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [saveName, setSaveName] = useState("");
   const [shareNew, setShareNew] = useState(false);
+  const [selected, setSelected] = useState<Record<string, number>>({});
+  const [bulkPriority, setBulkPriority] = useState("HIGH");
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
   const queryString = searchParams.toString();
 
   useEffect(() => {
@@ -52,6 +55,7 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
   const issueTypes = selectedProject?.issueTypes ?? data?.filters.projects.flatMap((project) => project.issueTypes) ?? [];
   const page = Number(searchParams.get("page") ?? 1);
   const pages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? 25)));
+  async function runBulk() { const selection = Object.entries(selected).map(([id, version]) => ({ id, version })), changes = { priority: bulkPriority }, querySnapshot = activeQuery(); setError(null); const previewResponse = await fetch("/api/bulk-operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preview: true, selection, changes, querySnapshot }) }); const preview = await previewResponse.json() as { preview?: { eligible: number; warnings: string[] }; error?: string }; if (!previewResponse.ok || !preview.preview) return setError(preview.error ?? "Bulk preview failed."); if (preview.preview.warnings.length || !window.confirm(`Update ${preview.preview.eligible} issues to ${bulkPriority} priority?`)) return setError(preview.preview.warnings.join(" ") || null); const response = await fetch("/api/bulk-operations", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ selection, changes, querySnapshot }) }); const result = await response.json() as { operation?: { id: string }; error?: string }; if (!response.ok || !result.operation) return setError(result.error ?? "Bulk operation could not start."); setBulkStatus("Bulk update queued…"); const timer = window.setInterval(async () => { const current = await fetch(`/api/bulk-operations/${result.operation!.id}`).then(value => value.json()) as { operation?: { status: string; succeeded: number; failed: number } }; if (current.operation && ["COMPLETED", "CANCELLED"].includes(current.operation.status)) { clearInterval(timer); setBulkStatus(`${current.operation.succeeded} updated, ${current.operation.failed} failed.`); setSelected({}); } }, 1000); }
 
   return <main className="workspace-search-page">
     <header><Link href="/" className="search-brand"><span>P</span> Planeo</Link><div><strong>{workspaceName}</strong><small>Workspace search</small></div></header>
@@ -74,10 +78,11 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
         <Filter label="Sort" value={searchParams.get("sort") ?? "updated"} onChange={(value) => update("sort", value)} allLabel="Updated" options={[["created", "Created"], ["priority", "Priority"], ["due", "Due date"], ["rank", "Rank"]]} />
       </div>
       <div className="search-results-heading"><strong>{data?.total ?? 0} issues</strong>{queryString && <button onClick={() => router.replace(pathname)}>Clear filters</button>}</div>
+      {!loading && data && data.results.length > 0 && <div className="bulk-toolbar" role="toolbar" aria-label="Bulk issue actions"><label><input type="checkbox" checked={data.results.every(issue => selected[issue.id] !== undefined)} onChange={(event) => setSelected(current => { const next = { ...current }; for (const issue of data.results) if (event.target.checked) next[issue.id] = issue.version ?? 0; else delete next[issue.id]; return next; })}/> Select this page</label><span>{Object.keys(selected).length} selected across pages</span><label>Set priority <select value={bulkPriority} onChange={event => setBulkPriority(event.target.value)}>{["URGENT","HIGH","MEDIUM","LOW"].map(value => <option key={value}>{value}</option>)}</select></label><button disabled={!Object.keys(selected).length} onClick={() => void runBulk()}>Preview and update</button>{bulkStatus && <span role="status">{bulkStatus}</span>}</div>}
       {loading && <div className="search-state" role="status">Loading search results…</div>}
       {error && <div className="search-state search-state-error" role="alert">{error}</div>}
       {!loading && !error && data?.results.length === 0 && <div className="search-state">No issues match these filters.</div>}
-      {!loading && !error && <div className="search-result-list">{data?.results.map((issue) => <Link key={issue.id} href={`/projects/${issue.key.split("-")[0]}?issue=${issue.id}&returnTo=${encodeURIComponent(`${pathname}?${queryString}`)}`}><strong>{issue.key}</strong><span>{issue.title}<small>{issue.projectName} · {issue.status} · {issue.priority}</small></span><em>{issue.assignee?.name ?? "Unassigned"}</em></Link>)}</div>}
+      {!loading && !error && <div className="search-result-list">{data?.results.map((issue) => <div key={issue.id}><input aria-label={`Select ${issue.key}`} type="checkbox" checked={selected[issue.id] !== undefined} onChange={event => setSelected(current => { const next = { ...current }; if (event.target.checked) next[issue.id] = issue.version ?? 0; else delete next[issue.id]; return next; })}/><Link href={`/projects/${issue.key.split("-")[0]}?issue=${issue.id}&returnTo=${encodeURIComponent(`${pathname}?${queryString}`)}`}><strong>{issue.key}</strong><span>{issue.title}<small>{issue.projectName} · {issue.status} · {issue.priority}</small></span><em>{issue.assignee?.name ?? "Unassigned"}</em></Link></div>)}</div>}
       {!loading && !error && data && data.total > data.pageSize && <nav className="search-pagination" aria-label="Search result pages"><button disabled={page <= 1} onClick={() => update("page", String(page - 1))}>Previous</button><span>Page {page} of {pages}</span><button disabled={page >= pages} onClick={() => update("page", String(page + 1))}>Next</button></nav>}
     </section>
   </main>;
