@@ -9,6 +9,7 @@ import { enqueueWebhook } from "@/lib/webhooks";
 import { validateCustomFieldWrites } from "@/lib/custom-fields";
 import { evaluateTransition } from "@/lib/workflow";
 import { enqueueAutomation } from "@/lib/automation";
+import { publishRealtime } from "@/lib/realtime";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -23,6 +24,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (projectMembership?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot update issues." }, { status: 403 });
   const existing = await db.issue.findFirst({ where: { id, workspaceId: project.workspaceId, projectId: project.id, archivedAt: null }, include: { watchers: { select: { userId: true } } } });
   if (!existing) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
+  if (body?.version !== undefined && (!Number.isInteger(body.version) || Number(body.version) !== existing.version)) return NextResponse.json({ error: "Issue changed since it was loaded. Refresh and retry.", currentVersion: existing.version }, { status: 409 });
 
   const data: { statusId?: string; summary?: string; description?: string; resolution?: string | null; priority?: "URGENT" | "HIGH" | "MEDIUM" | "LOW"; estimate?: number | null; assigneeId?: string | null; dueDate?: Date | null; completedAt?: Date | null } = {};
   const changes: Record<string, unknown> = {};
@@ -119,6 +121,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     for (const action of execution?.actions ?? []) if (action.type === "NOTIFY" && Array.isArray(action.recipientIds)) await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: action.recipientIds.filter((value): value is string => typeof value === "string") });
     await enqueueWebhook(tx, { workspaceId: project.workspaceId, projectId: project.id, event: "issue.updated", eventId: `issue.updated:${id}:${updated.version}`, data: { id, key: `${project.key}-${existing.number}`, version: updated.version } });
     await enqueueAutomation(tx, { workspaceId: project.workspaceId, projectId: project.id, event: data.statusId ? "issue.transitioned" : "issue.updated", eventId: `issue.updated:${id}:${updated.version}`, payload: { issueId: id, projectId: project.id, statusId: updated.statusId, priority: updated.priority, labels: labelNames ?? undefined } });
+    await publishRealtime(tx, { workspaceId: project.workspaceId, projectId: project.id, type: data.statusId ? "issue.transitioned" : "issue.updated", resourceId: id, payload: { id, version: updated.version } });
     return customFields.size ? tx.issue.findUniqueOrThrow({ where: { id }, include: issueInclude }) : updated;
   }); } catch (cause) { return NextResponse.json({ error: cause instanceof Error ? cause.message : "Issue could not be updated." }, { status: 400 }); }
   return NextResponse.json({ issue: toUiIssue(issue, project.key) });

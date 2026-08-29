@@ -43,6 +43,7 @@ export function toUiIssue(issue: IssueRecord, projectKey: string): Issue {
     releases: issue.releases.map(({release})=>({id:release.id,name:release.name,status:release.status,archived:Boolean(release.archivedAt),releasedAt:release.releasedAt?.toISOString()})),
     createdAt: issue.createdAt.toISOString(),
     updatedAt: issue.updatedAt.toISOString(),
+    version: issue.version,
     customFields: Object.fromEntries(issue.customFieldValues.map((item) => [item.fieldId, { name: item.field.name, type: item.field.type, value: item.value, options: Array.isArray(item.field.options) ? item.field.options.filter((value): value is string => typeof value === "string") : [], archived: Boolean(item.field.archivedAt) }])),
   };
 }

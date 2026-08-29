@@ -33,6 +33,7 @@ export interface Issue {
   releases?: Array<{id:string;name:string;status:"PLANNED"|"RELEASED";archived:boolean;releasedAt?:string}>;
   createdAt?: string;
   updatedAt?: string;
+  version?: number;
   customFields?: Record<string, { name: string; type: string; value: unknown; options: string[]; archived: boolean }>;
 }
 

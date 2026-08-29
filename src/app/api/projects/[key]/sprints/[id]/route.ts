@@ -19,6 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ke
     else if (action === "reorder") { const ids = Array.isArray(body?.issueIds) && body.issueIds.every((value) => typeof value === "string") ? body.issueIds as string[] : []; if (!ids.length || new Set(ids).size !== ids.length || await db.sprintIssue.count({ where: { sprintId: sprint.id, issueId: { in: ids } } }) !== ids.length) return NextResponse.json({ error: "Issue order is invalid." }, { status: 400 }); await db.$transaction(async (tx) => { const changed = await tx.sprint.updateMany({ where: { id: sprint.id, version: sprint.version }, data: { version: { increment: 1 } } }); if (changed.count !== 1) throw new Error("CONFLICT"); for (const [position, issueId] of ids.entries()) await tx.sprintIssue.update({ where: { sprintId_issueId: { sprintId: sprint.id, issueId } }, data: { position } }); }); }
     else return NextResponse.json({ error: "Unsupported sprint action." }, { status: 400 });
   } catch (cause) { if ((cause instanceof Error && cause.message === "CONFLICT") || (cause as { code?: string })?.code === "P2002") return conflict("Sprint changed concurrently or another sprint is active."); throw cause; }
+  await db.realtimeEvent.create({ data: { workspaceId: project.workspaceId, projectId: project.id, type: "sprint.updated", resourceId: sprint.id, payload: { id: sprint.id, action, previousVersion: sprint.version } } });
   return NextResponse.json({ ok: true });
 }
 
