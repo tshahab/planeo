@@ -7,6 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
 import { enqueueWebhook } from "@/lib/webhooks";
 import { validateCustomFieldWrites } from "@/lib/custom-fields";
+import { evaluateTransition } from "@/lib/workflow";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -22,7 +23,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const existing = await db.issue.findFirst({ where: { id, workspaceId: project.workspaceId, projectId: project.id, archivedAt: null }, include: { watchers: { select: { userId: true } } } });
   if (!existing) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
 
-  const data: { statusId?: string; summary?: string; description?: string; priority?: "URGENT" | "HIGH" | "MEDIUM" | "LOW"; estimate?: number | null; assigneeId?: string | null; dueDate?: Date | null; completedAt?: Date | null } = {};
+  const data: { statusId?: string; summary?: string; description?: string; resolution?: string | null; priority?: "URGENT" | "HIGH" | "MEDIUM" | "LOW"; estimate?: number | null; assigneeId?: string | null; dueDate?: Date | null; completedAt?: Date | null } = {};
   const changes: Record<string, unknown> = {};
   let labelNames: string[] | undefined;
 
@@ -30,19 +31,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (typeof body.status !== "string") return NextResponse.json({ error: "A valid status is required." }, { status: 400 });
     const status = await db.status.findFirst({ where: { projectId: project.id, name: body.status } });
     if (!status) return NextResponse.json({ error: "Status is not part of this project." }, { status: 400 });
-    if (status.id !== existing.statusId) {
-      const [transitionCount, allowedTransition, column] = await Promise.all([
-        db.workflowTransition.count({ where: { projectId: project.id } }),
-        db.workflowTransition.findUnique({ where: { projectId_fromStatusId_toStatusId: { projectId: project.id, fromStatusId: existing.statusId, toStatusId: status.id } } }),
-        db.boardColumn.findFirst({ where: { statusId: status.id, board: { projectId: project.id } } }),
-      ]);
-      if (transitionCount > 0 && !allowedTransition) return NextResponse.json({ error: "That workflow transition is not allowed." }, { status: 409 });
-      if (column?.wipLimit) { const count = await db.issue.count({ where: { projectId: project.id, statusId: status.id, archivedAt: null } }); if (count >= column.wipLimit) return NextResponse.json({ error: `${column.name} has reached its work-in-progress limit.` }, { status: 409 }); }
-    }
     data.statusId = status.id;
     data.completedAt = status.category === "DONE" ? new Date() : null;
     changes.status = { from: existing.statusId, to: status.id };
   }
+  if (body?.resolution !== undefined) { const resolution = typeof body.resolution === "string" ? body.resolution.trim() : ""; if (resolution.length > 200) return NextResponse.json({ error: "Resolution cannot exceed 200 characters." }, { status: 400 }); data.resolution = resolution || null; changes.resolution = { from: existing.resolution, to: data.resolution }; }
   if (body?.title !== undefined) {
     const title = typeof body.title === "string" ? body.title.trim() : "";
     if (!title || title.length > 200) return NextResponse.json({ error: "Title must contain 1–200 characters." }, { status: 400 });
@@ -97,7 +90,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   let issue;
   try { issue = await db.$transaction(async (tx) => {
-    const customFields = hasCustomFields ? await validateCustomFieldWrites(tx, { workspaceId: project.workspaceId, projectId: project.id, issueTypeId: existing.issueTypeId, values: body?.customFields, partial: true }) : new Map();
+    const execution = data.statusId && data.statusId !== existing.statusId ? await evaluateTransition(tx, { projectId: project.id, issueId: id, fromStatusId: existing.statusId, toStatusId: data.statusId, actorId: context.user.id, workspaceRole: context.role, projectRole: projectMembership?.role, proposed: { ...data } }) : null;
+    if (data.statusId && data.statusId !== existing.statusId) { const column = await tx.boardColumn.findFirst({ where: { statusId: data.statusId, board: { projectId: project.id } } }); if (column?.wipLimit && await tx.issue.count({ where: { projectId: project.id, statusId: data.statusId, archivedAt: null } }) >= column.wipLimit) throw new Error(`${column.name} has reached its work-in-progress limit.`); }
+    const actionFields: Record<string, unknown> = {}; for (const action of execution?.actions ?? []) { if (action.type === "ASSIGN") data.assigneeId = action.userId === "ACTOR" ? context.user.id : action.userId === "REPORTER" ? existing.reporterId : typeof action.userId === "string" ? action.userId : data.assigneeId; if (action.type === "SET_FIELD" && typeof action.fieldId === "string") actionFields[action.fieldId] = action.value; if (action.type === "SET_PRIORITY" && ["URGENT","HIGH","MEDIUM","LOW"].includes(String(action.value))) data.priority = action.value as typeof data.priority; }
+    const suppliedFields = hasCustomFields || Object.keys(actionFields).length ? { ...((body?.customFields && typeof body.customFields === "object" && !Array.isArray(body.customFields)) ? body.customFields as Record<string, unknown> : {}), ...actionFields } : undefined;
+    const customFields = suppliedFields ? await validateCustomFieldWrites(tx, { workspaceId: project.workspaceId, projectId: project.id, issueTypeId: existing.issueTypeId, values: suppliedFields, partial: true }) : new Map();
     if (labelNames !== undefined) {
       const labels = await Promise.all(labelNames.map((name) => tx.label.upsert({ where: { workspaceId_name: { workspaceId: project.workspaceId, name } }, update: {}, create: { workspaceId: project.workspaceId, name, color: labelColor(name) } })));
       await tx.issueLabel.deleteMany({ where: { issueId: id } });
@@ -110,13 +107,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
     for (const [fieldId, value] of customFields) await tx.customFieldValue.upsert({ where: { fieldId_issueId: { fieldId, issueId: id } }, update: { value }, create: { fieldId, issueId: id, workspaceId: project.workspaceId, projectId: project.id, value } });
     const activity = await tx.issueActivity.create({
-      data: { issueId: id, actorId: context.user.id, action: data.statusId && Object.keys(changes).length === 1 ? "issue.status_changed" : "issue.updated", changes: JSON.parse(JSON.stringify(changes)) as Prisma.InputJsonValue },
+      data: { issueId: id, actorId: context.user.id, action: data.statusId && Object.keys(changes).length === 1 ? "issue.status_changed" : "issue.updated", changes: JSON.parse(JSON.stringify({ ...changes, ...(execution ? { workflow: { transitionId: execution.transition.id, name: execution.transition.name, version: execution.transition.workflowVersion } } : {}) })) as Prisma.InputJsonValue },
     });
+    for (const action of execution?.actions ?? []) if (action.type === "COMMENT" && typeof action.text === "string" && action.text.trim()) await tx.comment.create({ data: { issueId: id, authorId: context.user.id, body: action.text.trim().slice(0, 20_000) } });
     if (data.statusId !== undefined || data.estimate !== undefined) await tx.issueHistory.create({ data: { workspaceId: project.workspaceId, projectId: project.id, issueId: id, event: data.statusId !== undefined ? "STATUS_CHANGED" : "ESTIMATE_CHANGED", statusCategory: updated.status.category, estimate: updated.estimate } });
     const base = { workspaceId: project.workspaceId, issueId: id, issueKey: `${project.key}-${existing.number}`, issueTitle: data.summary ?? existing.summary, actorId: context.user.id, eventId: activity.id };
     if (data.assigneeId && data.assigneeId !== existing.assigneeId) await createIssueNotifications(tx, { ...base, type: "ASSIGNED", recipientIds: [data.assigneeId] });
     await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });
     await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: existing.watchers.map(({ userId }) => userId) });
+    for (const action of execution?.actions ?? []) if (action.type === "NOTIFY" && Array.isArray(action.recipientIds)) await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: action.recipientIds.filter((value): value is string => typeof value === "string") });
     await enqueueWebhook(tx, { workspaceId: project.workspaceId, projectId: project.id, event: "issue.updated", eventId: `issue.updated:${id}:${updated.version}`, data: { id, key: `${project.key}-${existing.number}`, version: updated.version } });
     return customFields.size ? tx.issue.findUniqueOrThrow({ where: { id }, include: issueInclude }) : updated;
   }); } catch (cause) { return NextResponse.json({ error: cause instanceof Error ? cause.message : "Issue could not be updated." }, { status: 400 }); }
