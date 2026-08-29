@@ -171,6 +171,20 @@ model Workspace {
   automationExecutions AutomationExecution[]
   developmentConnections DevelopmentConnection[]
   developmentDeliveries DevelopmentWebhookDelivery[]
+  realtimeEvents RealtimeEvent[]
+}
+
+model RealtimeEvent {
+  id BigInt @id @default(autoincrement())
+  workspaceId String
+  projectId String?
+  type String
+  resourceId String?
+  payload Json
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
+  @@index([workspaceId, id])
+  @@index([createdAt])
 }
 
 model WorkspaceInvitation {

@@ -1,0 +1,1 @@
+import{describe,expect,it}from"vitest";import{realtimeBackoff,REALTIME_RETENTION_MS}from"../../src/lib/realtime";describe("realtime transport",()=>{it("bounds reconnect backoff and history",()=>{expect(realtimeBackoff(0)).toBe(1000);expect(realtimeBackoff(20)).toBe(30000);expect(REALTIME_RETENTION_MS).toBe(86_400_000)})});

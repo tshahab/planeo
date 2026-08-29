@@ -63,6 +63,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
       });
     return () => controller.abort();
   }, [project.key, searchParams]);
+  useEffect(() => { let fallback: ReturnType<typeof setInterval> | undefined; const source = new EventSource("/api/realtime"); const refresh = () => fetch(`/api/issues?projectKey=${encodeURIComponent(project.key)}`).then((response) => response.ok ? response.json() : null).then((result: { issues?: Issue[] } | null) => { if (result?.issues) setIssues(result.issues); }).catch(() => undefined); const refreshNotifications = () => fetch("/api/notifications?page=1").then((response) => response.ok ? response.json() : null).then((result: { unread?: number } | null) => { if (typeof result?.unread === "number") setUnreadNotifications(result.unread); }).catch(() => undefined); for (const event of ["issue.created","issue.updated","issue.transitioned","board.updated","backlog.updated","sprint.updated","release.updated","automation.completed"]) source.addEventListener(event, refresh); source.addEventListener("notification.updated", refreshNotifications); source.addEventListener("reset", () => { refresh(); refreshNotifications(); }); source.addEventListener("degraded", () => { if (!fallback) fallback = setInterval(refresh, 15_000); }); source.onerror = () => { if (!fallback) fallback = setInterval(refresh, 15_000); }; source.onopen = () => { if (fallback) clearInterval(fallback); fallback = undefined; }; return () => { source.close(); if (fallback) clearInterval(fallback); }; }, [project.key]);
 
   function closeIssue() {
     setSelectedIssue(null);
@@ -82,7 +83,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
     setSelectedIssue((current) => current?.id === id ? { ...current, status } : current);
     setSyncError(null);
     try {
-      const response = await fetch(`/api/issues/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+      const response = await fetch(`/api/issues/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, version: previous?.version }) });
       if (!response.ok) throw new Error("The status change could not be saved.");
       const { issue } = await response.json() as { issue: Issue };
       setIssues((current) => current.map((item) => item.id === id ? issue : item));
@@ -97,7 +98,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   }
 
   async function updateIssue(id: string, changes: Record<string, unknown>) {
-    const response = await fetch(`/api/issues/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(changes) });
+    const current = issues.find((item) => item.id === id); const response = await fetch(`/api/issues/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...changes, version: current?.version }) });
     const result = await response.json() as { issue?: Issue; error?: string };
     if (!response.ok || !result.issue) throw new Error(result.error ?? "The issue changes could not be saved.");
     setIssues((current) => current.map((item) => item.id === id ? result.issue! : item));
