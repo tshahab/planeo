@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { validateCustomFieldWrites } from "@/lib/custom-fields";
 
@@ -7,7 +8,7 @@ afterAll(() => db.$disconnect());
 
 async function fixture(suffix: string) {
   const workspace = await db.workspace.create({ data: { name: suffix, slug: `custom-field-${suffix}` } });
-  const user = await db.user.create({ data: { name: suffix, email: `custom-${suffix}@example.test`, memberships: { create: { workspaceId: workspace.id, role: "OWNER" } } } });
+  const user = await db.user.create({ data: { name: suffix, email: `custom-${suffix}-${randomUUID()}@example.test`, memberships: { create: { workspaceId: workspace.id, role: "OWNER" } } } });
   const project = await db.project.create({ data: { workspaceId: workspace.id, name: suffix, key: suffix.toUpperCase().slice(0, 5), members: { create: { userId: user.id, role: "ADMIN" } }, issueTypes: { create: { name: "Task", kind: "TASK", position: 0 } } }, include: { issueTypes: true } });
   return { workspace, user, project, type: project.issueTypes[0] };
 }

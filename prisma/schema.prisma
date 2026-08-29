@@ -233,6 +233,7 @@ model Project {
   sprints       Sprint[]
   invitations   WorkspaceInvitation[]
   workflowTransitions WorkflowTransition[]
+  workflowVersions WorkflowVersion[]
   issueImports IssueImport[]
   importedIssues ImportedIssue[]
   issueHistory IssueHistory[]
@@ -294,6 +295,14 @@ model WorkflowTransition {
   projectId String
   fromStatusId String
   toStatusId String
+  name String @default("Transition")
+  description String?
+  position Int @default(0)
+  enabled Boolean @default(true)
+  conditions Json?
+  validators Json?
+  actions Json?
+  workflowVersion Int @default(1)
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   fromStatus Status @relation("TransitionFrom", fields: [fromStatusId], references: [id], onDelete: Cascade)
   toStatus   Status @relation("TransitionTo", fields: [toStatusId], references: [id], onDelete: Cascade)
@@ -301,6 +310,19 @@ model WorkflowTransition {
   @@unique([projectId, fromStatusId, toStatusId])
   @@index([fromStatusId])
   @@index([toStatusId])
+}
+
+model WorkflowVersion {
+  id String @id @default(cuid())
+  projectId String
+  version Int
+  configuration Json
+  createdById String
+  publishedAt DateTime @default(now())
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId, publishedAt])
 }
 
 model Issue {
@@ -315,6 +337,7 @@ model Issue {
   parentId     String?
   summary      String
   description  Json?
+  resolution   String?
   priority     Priority        @default(MEDIUM)
   estimate     Int?
   rank         String

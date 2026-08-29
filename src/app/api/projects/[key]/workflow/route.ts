@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { validateWorkflowDraft, type TransitionDraft } from "@/lib/workflow";
 
 const categories = ["TODO", "IN_PROGRESS", "DONE"] as const;
 const kinds = ["EPIC", "STORY", "TASK", "BUG", "SUBTASK"] as const;
@@ -20,13 +21,15 @@ async function managedProject(key: string) {
 export async function GET(_: Request, { params }: { params: Promise<{ key: string }> }) {
   const result = await managedProject((await params).key); if (result.error) return result.error;
   const { project } = result;
-  const [statuses, issueTypes, board, transitions] = await Promise.all([
+  const [statuses, issueTypes, board, transitions, versions, customFields] = await Promise.all([
     db.status.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" } }),
     db.issueType.findMany({ where: { projectId: project.id }, orderBy: { position: "asc" } }),
     db.board.findFirst({ where: { projectId: project.id }, include: { columns: { orderBy: { position: "asc" } } } }),
-    db.workflowTransition.findMany({ where: { projectId: project.id }, select: { fromStatusId: true, toStatusId: true } }),
+    db.workflowTransition.findMany({ where: { projectId: project.id }, orderBy: [{ position: "asc" }, { id: "asc" }] }),
+    db.workflowVersion.findMany({ where: { projectId: project.id }, orderBy: { version: "desc" }, take: 20, select: { version: true, publishedAt: true, createdById: true } }),
+    db.customFieldProject.findMany({ where: { projectId: project.id, field: { archivedAt: null } }, include: { field: true } }),
   ]);
-  return NextResponse.json({ project: { defaultPriority: project.defaultPriority }, statuses, issueTypes, board, transitions });
+  return NextResponse.json({ project: { defaultPriority: project.defaultPriority }, statuses, issueTypes, board, transitions, versions, customFields });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ key: string }> }) {
@@ -63,7 +66,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ke
     } else if (action === "column.update") {
       const column = await tx.boardColumn.findFirst({ where: { id, board: { projectId: project.id } } }); if (!column) throw new Error("NOT_FOUND"); const name = body?.name === undefined ? column.name : text(body.name, 50); const wipLimit = body?.wipLimit === null || body?.wipLimit === "" ? null : Number(body?.wipLimit); if (!name || (wipLimit !== null && (!Number.isInteger(wipLimit) || wipLimit < 1 || wipLimit > 999))) throw new Error("INVALID_COLUMN"); await tx.boardColumn.update({ where: { id }, data: { name, wipLimit } });
     } else if (action === "transitions.set") {
-      if (!Array.isArray(body?.transitions)) throw new Error("INVALID_TRANSITIONS"); const pairs = body.transitions as Array<{ fromStatusId?: unknown; toStatusId?: unknown }>; const ids = [...new Set(pairs.flatMap(pair => [pair.fromStatusId, pair.toStatusId]).filter(value => typeof value === "string") as string[])]; const count = await tx.status.count({ where: { projectId: project.id, id: { in: ids } } }); if (count !== ids.length || pairs.some(pair => typeof pair.fromStatusId !== "string" || typeof pair.toStatusId !== "string" || pair.fromStatusId === pair.toStatusId)) throw new Error("INVALID_TRANSITIONS"); await tx.workflowTransition.deleteMany({ where: { projectId: project.id } }); if (pairs.length) await tx.workflowTransition.createMany({ data: pairs.map(pair => ({ projectId: project.id, fromStatusId: pair.fromStatusId as string, toStatusId: pair.toStatusId as string })) });
+      if (!Array.isArray(body?.transitions)) throw new Error("INVALID_TRANSITIONS"); const draft = await validateWorkflowDraft(tx, project.id, body.transitions as TransitionDraft[]); if (body.preview === true) return; const latest = await tx.workflowVersion.aggregate({ where: { projectId: project.id }, _max: { version: true } }); const version = (latest._max.version ?? 0) + 1; await tx.workflowTransition.deleteMany({ where: { projectId: project.id } }); for (const item of draft) await tx.workflowTransition.create({ data: { projectId: project.id, fromStatusId: item.fromStatusId, toStatusId: item.toStatusId, name: item.name!.trim(), description: item.description?.trim(), position: item.position ?? 0, enabled: item.enabled !== false, conditions: (item.conditions ?? []) as Prisma.InputJsonValue, validators: (item.validators ?? []) as Prisma.InputJsonValue, actions: (item.actions ?? []) as Prisma.InputJsonValue, workflowVersion: version } }); await tx.workflowVersion.create({ data: { projectId: project.id, version, createdById: context.user.id, configuration: JSON.parse(JSON.stringify(draft)) as Prisma.InputJsonValue } }); targetId = String(version);
     } else if (action === "defaults.update") {
       const defaultPriority = body?.defaultPriority as typeof priorities[number]; if (!priorities.includes(defaultPriority)) throw new Error("INVALID_PRIORITY"); await tx.project.update({ where: { id: project.id }, data: { defaultPriority } });
     } else throw new Error("INVALID_ACTION");
