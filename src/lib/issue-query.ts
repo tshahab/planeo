@@ -9,6 +9,7 @@ export const issueInclude = {
   sprintIssues: { include: { sprint: { select: { id: true, name: true } } }, orderBy: { addedAt: "desc" as const }, take: 1 },
   releases: { include: { release: { select: { id: true, name: true, status: true, archivedAt: true, releasedAt: true } } }, orderBy: { addedAt: "asc" as const } },
   labels: { include: { label: true } },
+  customFieldValues: { include: { field: true }, orderBy: { field: { name: "asc" as const } } },
   _count: { select: { comments: true, attachments: true } },
 } as const;
 

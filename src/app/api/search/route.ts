@@ -20,6 +20,9 @@ export async function GET(request: Request) {
   const priority = priorities.find((value) => value === params.get("priority")?.toUpperCase());
   const from = dateParam(params.get("from"));
   const to = dateParam(params.get("to"), true);
+  const customFieldId = params.get("customFieldId");
+  let customFieldValue: Prisma.InputJsonValue | undefined;
+  if (customFieldId && params.has("customFieldValue")) { try { customFieldValue = JSON.parse(params.get("customFieldValue")!) as Prisma.InputJsonValue; } catch { return NextResponse.json({ error: "Custom-field filter value must be valid JSON." }, { status: 400 }); } }
   if (params.get("from") && !from || params.get("to") && !to) return NextResponse.json({ error: "Dates must use YYYY-MM-DD." }, { status: 400 });
 
   const exactKey = /^([A-Z][A-Z0-9]{1,9})-(\d+)$/i.exec(query);
@@ -42,6 +45,7 @@ export async function GET(request: Request) {
     ...(params.get("label") ? { labels: { some: { labelId: params.get("label")! } } } : {}),
     ...(params.get("sprint") ? { sprintIssues: { some: { sprintId: params.get("sprint")! } } } : {}),
     ...(params.get("release") ? { releases: { some: { releaseId: params.get("release")! } } } : {}),
+    ...(customFieldId ? { customFieldValues: { some: { fieldId: customFieldId, field: { workspaceId: context.workspace.id }, ...(customFieldValue === undefined ? {} : { value: { equals: customFieldValue } }) } } } : {}),
     ...(params.get("overdue") === "true" ? { dueDate: { lt: new Date() }, status: { category: { not: "DONE" } } } : {}),
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
   };
