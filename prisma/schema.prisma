@@ -105,6 +105,17 @@ enum AutomationJobStatus {
   DELIVERED
   DEAD
 }
+enum BulkOperationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
+enum BulkOperationItemStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
 enum DevelopmentProvider {
   GITHUB
   GITLAB
@@ -172,6 +183,42 @@ model Workspace {
   developmentConnections DevelopmentConnection[]
   developmentDeliveries DevelopmentWebhookDelivery[]
   realtimeEvents RealtimeEvent[]
+  bulkOperations BulkOperation[]
+}
+
+model BulkOperation {
+  id String @id @default(cuid())
+  workspaceId String
+  actorId String
+  idempotencyKey String
+  querySnapshot Json
+  changes Json
+  status BulkOperationStatus @default(PENDING)
+  total Int
+  succeeded Int @default(0)
+  failed Int @default(0)
+  cancelRequestedAt DateTime?
+  startedAt DateTime?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
+  items BulkOperationItem[]
+  @@unique([workspaceId, actorId, idempotencyKey])
+  @@index([status, createdAt])
+}
+
+model BulkOperationItem {
+  id String @id @default(cuid())
+  operationId String
+  issueId String
+  expectedVersion Int
+  status BulkOperationItemStatus @default(PENDING)
+  error String?
+  completedAt DateTime?
+  operation BulkOperation @relation(fields:[operationId], references:[id], onDelete:Cascade)
+  @@unique([operationId, issueId])
+  @@index([operationId, status])
 }
 
 model RealtimeEvent {

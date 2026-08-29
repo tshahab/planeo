@@ -22,6 +22,7 @@
     "email:worker": "node ops/email-worker.mjs",
     "webhook:worker": "node ops/webhook-worker.mjs"
     ,"automation:worker": "node ops/automation-worker.mjs"
+    ,"bulk:worker": "node ops/bulk-worker.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.9.1",

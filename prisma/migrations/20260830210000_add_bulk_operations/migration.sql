@@ -1,0 +1,8 @@
+CREATE TYPE "BulkOperationStatus" AS ENUM ('PENDING','PROCESSING','COMPLETED','CANCELLED');
+CREATE TYPE "BulkOperationItemStatus" AS ENUM ('PENDING','SUCCEEDED','FAILED');
+CREATE TABLE "BulkOperation" ("id" TEXT PRIMARY KEY,"workspaceId" TEXT NOT NULL,"actorId" TEXT NOT NULL,"idempotencyKey" TEXT NOT NULL,"querySnapshot" JSONB NOT NULL,"changes" JSONB NOT NULL,"status" "BulkOperationStatus" NOT NULL DEFAULT 'PENDING',"total" INTEGER NOT NULL,"succeeded" INTEGER NOT NULL DEFAULT 0,"failed" INTEGER NOT NULL DEFAULT 0,"cancelRequestedAt" TIMESTAMP(3),"startedAt" TIMESTAMP(3),"completedAt" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "BulkOperation_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE);
+CREATE UNIQUE INDEX "BulkOperation_workspaceId_actorId_idempotencyKey_key" ON "BulkOperation"("workspaceId","actorId","idempotencyKey");
+CREATE INDEX "BulkOperation_status_createdAt_idx" ON "BulkOperation"("status","createdAt");
+CREATE TABLE "BulkOperationItem" ("id" TEXT PRIMARY KEY,"operationId" TEXT NOT NULL,"issueId" TEXT NOT NULL,"expectedVersion" INTEGER NOT NULL,"status" "BulkOperationItemStatus" NOT NULL DEFAULT 'PENDING',"error" TEXT,"completedAt" TIMESTAMP(3),CONSTRAINT "BulkOperationItem_operationId_fkey" FOREIGN KEY ("operationId") REFERENCES "BulkOperation"("id") ON DELETE CASCADE);
+CREATE UNIQUE INDEX "BulkOperationItem_operationId_issueId_key" ON "BulkOperationItem"("operationId","issueId");
+CREATE INDEX "BulkOperationItem_operationId_status_idx" ON "BulkOperationItem"("operationId","status");
