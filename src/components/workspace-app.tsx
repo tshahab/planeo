@@ -30,6 +30,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   const [syncError, setSyncError] = useState<string | null>(null);
   const [view, setView] = useState<"summary" | "board" | "backlog">("summary");
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [customFields, setCustomFields] = useState<Array<{ required: boolean; issueTypeIds: unknown; field: { id: string; name: string; type: string; options: unknown; defaultValue: unknown } }>>([]);
   const createTrigger = useRef<HTMLElement | null>(null);
 
   function openCreate() {
@@ -43,6 +44,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   }
 
   useEffect(() => { const controller = new AbortController(); fetch("/api/notifications?page=1", { signal: controller.signal }).then((response) => response.ok ? response.json() : { unread: 0 }).then((result: { unread: number }) => setUnreadNotifications(result.unread)).catch(() => undefined); return () => controller.abort(); }, []);
+  useEffect(() => { const controller = new AbortController(); fetch(`/api/projects/${project.key}/custom-fields`, { signal: controller.signal }).then((response) => response.ok ? response.json() : { fields: [] }).then((result: { fields?: typeof customFields }) => setCustomFields(result.fields ?? [])).catch(() => undefined); return () => controller.abort(); }, [project.key]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -108,7 +110,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
       const response = await fetch("/api/issues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectKey: project.key, title: draft.title, description: draft.description, priority: draft.priority, assigneeId: draft.assignee?.id, issueTypeId: draft.issueTypeId }),
+        body: JSON.stringify({ projectKey: project.key, title: draft.title, description: draft.description, priority: draft.priority, assigneeId: draft.assignee?.id, issueTypeId: draft.issueTypeId, customFields: Object.fromEntries(Object.entries(draft.customFields ?? {}).map(([id, field]) => [id, field.value])) }),
       });
       const result = await response.json() as { issue?: Issue; error?: string };
       if (!response.ok || !result.issue) throw new Error(result.error ?? "The issue could not be created.");
@@ -181,7 +183,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
       </main>
 
       {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={closeIssue} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} onArchive={canManageProject ? async () => { const response = await fetch(`/api/issues/${selectedIssue.id}/archive`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "archive" }) }); if (!response.ok) throw new Error("Issue could not be archived."); setIssues((current) => current.filter((item) => item.id !== selectedIssue.id)); setSelectedIssue(null); } : undefined} readOnly={!canWriteProject} />}
-      {creating && <CreateIssue project={project} people={projectPeople} issueTypes={issueTypes} statuses={statuses} nextNumber={issues.length + 1} onClose={closeCreate} onCreate={addIssue} />}
+      {creating && <CreateIssue project={project} people={projectPeople} issueTypes={issueTypes} statuses={statuses} customFields={customFields} nextNumber={issues.length + 1} onClose={closeCreate} onCreate={addIssue} />}
       {creatingProject && <CreateProject onClose={() => setCreatingProject(false)} />}
       {managingMembers && <ProjectMembers projectKey={project.key} projectName={project.name} onClose={() => setManagingMembers(false)} />}
       {syncError && <div className="sync-error" role="alert"><span>{syncError}</span><button onClick={() => setSyncError(null)} aria-label="Dismiss error"><X size={15} /></button></div>}

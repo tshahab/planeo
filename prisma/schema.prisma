@@ -89,6 +89,17 @@ enum WebhookDeliveryStatus {
   DEAD
 }
 
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SINGLE_SELECT
+  MULTI_SELECT
+  USER
+  URL
+}
+
 model User {
   id             String            @id @default(cuid())
   email          String            @unique
@@ -137,6 +148,7 @@ model Workspace {
   issueHistory IssueHistory[]
   apiTokens ApiToken[]
   webhookSubscriptions WebhookSubscription[]
+  customFields CustomField[]
 }
 
 model WorkspaceInvitation {
@@ -226,6 +238,8 @@ model Project {
   issueHistory IssueHistory[]
   releases Release[]
   webhookSubscriptions WebhookSubscription[]
+  customFieldConfigurations CustomFieldProject[]
+  customFieldValues CustomFieldValue[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
 
@@ -331,11 +345,61 @@ model Issue {
   importRecord ImportedIssue?
   history IssueHistory[]
   releases IssueRelease[]
+  customFieldValues CustomFieldValue[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
+}
+
+model CustomField {
+  id           String          @id @default(cuid())
+  workspaceId  String
+  name         String
+  description  String?
+  type         CustomFieldType
+  options      Json?
+  defaultValue Json?
+  archivedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects     CustomFieldProject[]
+  values       CustomFieldValue[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, archivedAt])
+}
+
+model CustomFieldProject {
+  fieldId      String
+  projectId    String
+  required     Boolean     @default(false)
+  issueTypeIds Json?
+  position     Int         @default(0)
+  field        CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([fieldId, projectId])
+  @@index([projectId, position])
+}
+
+model CustomFieldValue {
+  fieldId    String
+  issueId    String
+  workspaceId String
+  projectId  String
+  value      Json
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  field      CustomField @relation(fields: [fieldId], references: [id], onDelete: Restrict)
+  issue      Issue       @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([fieldId, issueId])
+  @@index([workspaceId, projectId, fieldId])
+  @@index([issueId])
 }
 
 model Release {

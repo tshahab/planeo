@@ -1,4 +1,4 @@
-export const ISSUE_CSV_COLUMNS = ["externalId", "summary", "description", "type", "status", "priority", "assigneeEmail", "labels", "estimate", "dueDate", "parentExternalId", "links", "releases"] as const;
+export const ISSUE_CSV_COLUMNS = ["externalId", "summary", "description", "type", "status", "priority", "assigneeEmail", "labels", "estimate", "dueDate", "parentExternalId", "links", "releases", "customFields"] as const;
 export type IssueCsvRow = Record<typeof ISSUE_CSV_COLUMNS[number], string>;
 
 export function parseCsv(input: string, maxRows = 5000): { rows: IssueCsvRow[]; errors: { row: number; field: string; message: string }[] } {
@@ -9,7 +9,7 @@ export function parseCsv(input: string, maxRows = 5000): { rows: IssueCsvRow[]; 
   const header = records.shift() ?? []; const errors: { row: number; field: string; message: string }[] = [];
   if (header.join("\0") !== ISSUE_CSV_COLUMNS.join("\0")) errors.push({ row: 1, field: "header", message: `Expected columns: ${ISSUE_CSV_COLUMNS.join(",")}` });
   if (records.length > maxRows) errors.push({ row: maxRows + 2, field: "csv", message: `CSV exceeds the ${maxRows}-row limit.` });
-  const rows = records.slice(0, maxRows).filter((values) => values.some(Boolean)).map((values, index) => { if (values.length !== ISSUE_CSV_COLUMNS.length) errors.push({ row: index + 2, field: "csv", message: `Expected ${ISSUE_CSV_COLUMNS.length} fields, received ${values.length}.` }); return Object.fromEntries(ISSUE_CSV_COLUMNS.map((column, columnIndex) => [column, values[columnIndex] ?? ""])) as IssueCsvRow; });
+  const rows = records.slice(0, maxRows).filter((values) => values.some(Boolean)).map((values, index) => { if (values.length < ISSUE_CSV_COLUMNS.length - 1 || values.length > ISSUE_CSV_COLUMNS.length) errors.push({ row: index + 2, field: "csv", message: `Expected ${ISSUE_CSV_COLUMNS.length} fields, received ${values.length}.` }); return Object.fromEntries(ISSUE_CSV_COLUMNS.map((column, columnIndex) => [column, values[columnIndex] ?? ""])) as IssueCsvRow; });
   return { rows, errors };
 }
 

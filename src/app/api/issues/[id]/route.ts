@@ -6,6 +6,7 @@ import { getProjectForContext, issueInclude } from "@/lib/issue-query";
 import type { Prisma } from "@prisma/client";
 import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
 import { enqueueWebhook } from "@/lib/webhooks";
+import { validateCustomFieldWrites } from "@/lib/custom-fields";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -90,10 +91,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (labelNames.length > 10 || labelNames.some((label) => label.length > 50)) return NextResponse.json({ error: "Use up to 10 labels, each 50 characters or fewer." }, { status: 400 });
     changes.labels = labelNames;
   }
-  if (Object.keys(data).length === 0 && labelNames === undefined) return NextResponse.json({ error: "No supported changes were provided." }, { status: 400 });
+  const hasCustomFields = body?.customFields !== undefined;
+  if (Object.keys(data).length === 0 && labelNames === undefined && !hasCustomFields) return NextResponse.json({ error: "No supported changes were provided." }, { status: 400 });
   const mentions = typeof data.description === "string" ? await db.user.findMany({ where: { email: { in: mentionedEmails(data.description), mode: "insensitive" }, memberships: { some: { workspaceId: project.workspaceId } }, OR: [{ projectRoles: { some: { projectId: project.id } } }, ...(project.visibility === "PUBLIC" ? [{}] : [])] }, select: { id: true } }) : [];
 
-  const issue = await db.$transaction(async (tx) => {
+  let issue;
+  try { issue = await db.$transaction(async (tx) => {
+    const customFields = hasCustomFields ? await validateCustomFieldWrites(tx, { workspaceId: project.workspaceId, projectId: project.id, issueTypeId: existing.issueTypeId, values: body?.customFields, partial: true }) : new Map();
     if (labelNames !== undefined) {
       const labels = await Promise.all(labelNames.map((name) => tx.label.upsert({ where: { workspaceId_name: { workspaceId: project.workspaceId, name } }, update: {}, create: { workspaceId: project.workspaceId, name, color: labelColor(name) } })));
       await tx.issueLabel.deleteMany({ where: { issueId: id } });
@@ -104,6 +108,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       data: { ...data, version: { increment: 1 } },
       include: issueInclude,
     });
+    for (const [fieldId, value] of customFields) await tx.customFieldValue.upsert({ where: { fieldId_issueId: { fieldId, issueId: id } }, update: { value }, create: { fieldId, issueId: id, workspaceId: project.workspaceId, projectId: project.id, value } });
     const activity = await tx.issueActivity.create({
       data: { issueId: id, actorId: context.user.id, action: data.statusId && Object.keys(changes).length === 1 ? "issue.status_changed" : "issue.updated", changes: JSON.parse(JSON.stringify(changes)) as Prisma.InputJsonValue },
     });
@@ -113,8 +118,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });
     await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: existing.watchers.map(({ userId }) => userId) });
     await enqueueWebhook(tx, { workspaceId: project.workspaceId, projectId: project.id, event: "issue.updated", eventId: `issue.updated:${id}:${updated.version}`, data: { id, key: `${project.key}-${existing.number}`, version: updated.version } });
-    return updated;
-  });
+    return customFields.size ? tx.issue.findUniqueOrThrow({ where: { id }, include: issueInclude }) : updated;
+  }); } catch (cause) { return NextResponse.json({ error: cause instanceof Error ? cause.message : "Issue could not be updated." }, { status: 400 }); }
   return NextResponse.json({ issue: toUiIssue(issue, project.key) });
 }
 
