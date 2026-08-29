@@ -105,6 +105,17 @@ enum AutomationJobStatus {
   DELIVERED
   DEAD
 }
+enum DevelopmentProvider {
+  GITHUB
+  GITLAB
+}
+enum DevelopmentActivityKind {
+  BRANCH
+  COMMIT
+  PULL_REQUEST
+  MERGE_REQUEST
+  BUILD
+}
 
 model User {
   id             String            @id @default(cuid())
@@ -158,6 +169,8 @@ model Workspace {
   automationRules AutomationRule[]
   automationJobs AutomationJob[]
   automationExecutions AutomationExecution[]
+  developmentConnections DevelopmentConnection[]
+  developmentDeliveries DevelopmentWebhookDelivery[]
 }
 
 model WorkspaceInvitation {
@@ -435,11 +448,82 @@ model Issue {
   history IssueHistory[]
   releases IssueRelease[]
   customFieldValues CustomFieldValue[]
+  developmentActivities DevelopmentActivity[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
+}
+
+model DevelopmentConnection {
+  id String @id @default(cuid())
+  workspaceId String
+  provider DevelopmentProvider
+  name String
+  baseUrl String
+  encryptedCredential String
+  encryptedWebhookSecret String
+  credentialFingerprint String
+  enabled Boolean @default(true)
+  lastSyncedAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
+  repositories DevelopmentRepository[]
+  deliveries DevelopmentWebhookDelivery[]
+  @@index([workspaceId, provider, enabled])
+}
+model DevelopmentRepository {
+  id String @id @default(cuid())
+  connectionId String
+  externalId String
+  fullName String
+  webUrl String
+  defaultBranch String?
+  selected Boolean @default(true)
+  accessible Boolean @default(true)
+  lastSyncedAt DateTime?
+  connection DevelopmentConnection @relation(fields:[connectionId], references:[id], onDelete:Cascade)
+  activities DevelopmentActivity[]
+  @@unique([connectionId, externalId])
+  @@index([connectionId, selected])
+}
+model DevelopmentActivity {
+  id String @id @default(cuid())
+  repositoryId String
+  issueId String
+  externalId String
+  kind DevelopmentActivityKind
+  title String
+  url String
+  authorName String?
+  targetBranch String?
+  state String?
+  reviewState String?
+  buildState String?
+  mergedAt DateTime?
+  externalUpdatedAt DateTime
+  payload Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  repository DevelopmentRepository @relation(fields:[repositoryId], references:[id], onDelete:Restrict)
+  issue Issue @relation(fields:[issueId], references:[id], onDelete:Cascade)
+  @@unique([repositoryId, externalId, issueId])
+  @@index([issueId, externalUpdatedAt])
+}
+model DevelopmentWebhookDelivery {
+  id String @id @default(cuid())
+  workspaceId String
+  connectionId String
+  deliveryId String
+  event String
+  receivedAt DateTime @default(now())
+  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
+  connection DevelopmentConnection @relation(fields:[connectionId], references:[id], onDelete:Cascade)
+  @@unique([connectionId, deliveryId])
+  @@index([workspaceId, receivedAt])
 }
 
 model CustomField {
