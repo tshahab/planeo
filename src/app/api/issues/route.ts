@@ -6,6 +6,7 @@ import { getProjectForContext, issueInclude } from "@/lib/issue-query";
 import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
 import { enqueueWebhook } from "@/lib/webhooks";
 import { validateCustomFieldWrites } from "@/lib/custom-fields";
+import { enqueueAutomation } from "@/lib/automation";
 
 export async function GET(request: Request) {
   const context = await getAuthContext();
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
     if (customFields.size) await tx.customFieldValue.createMany({ data: [...customFields].map(([fieldId, value]) => ({ fieldId, issueId: created.id, workspaceId: project.workspaceId, projectId: project.id, value })) });
     await tx.issueHistory.create({ data: { workspaceId: project.workspaceId, projectId: project.id, issueId: created.id, event: "CREATED", statusCategory: status.category, estimate: created.estimate } });
     await enqueueWebhook(tx, { workspaceId: project.workspaceId, projectId: project.id, event: "issue.created", eventId: `issue.created:${created.id}`, data: { id: created.id, key: `${project.key}-${created.number}`, version: created.version } });
+    await enqueueAutomation(tx, { workspaceId: project.workspaceId, projectId: project.id, event: "issue.created", eventId: `issue.created:${created.id}`, payload: { issueId: created.id, projectId: project.id, statusId: created.statusId, priority: created.priority } });
     const base = { workspaceId: project.workspaceId, issueId: created.id, issueKey: `${project.key}-${created.number}`, issueTitle: created.summary, actorId: reporter.id, eventId: activity.id };
     if (created.assigneeId) await createIssueNotifications(tx, { ...base, type: "ASSIGNED", recipientIds: [created.assigneeId] });
     await createIssueNotifications(tx, { ...base, type: "MENTIONED", recipientIds: mentions.map(({ id: userId }) => userId) });

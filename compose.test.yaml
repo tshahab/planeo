@@ -60,6 +60,17 @@ services:
         condition: service_healthy
     command: ["sh", "-c", "pnpm db:deploy && pnpm webhook:worker"]
 
+  automation-worker-test:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
+    depends_on:
+      test-database:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm db:deploy && pnpm automation:worker"]
+
   test-app:
     build:
       context: .

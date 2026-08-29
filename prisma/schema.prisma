@@ -99,6 +99,12 @@ enum CustomFieldType {
   USER
   URL
 }
+enum AutomationJobStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  DEAD
+}
 
 model User {
   id             String            @id @default(cuid())
@@ -149,6 +155,9 @@ model Workspace {
   apiTokens ApiToken[]
   webhookSubscriptions WebhookSubscription[]
   customFields CustomField[]
+  automationRules AutomationRule[]
+  automationJobs AutomationJob[]
+  automationExecutions AutomationExecution[]
 }
 
 model WorkspaceInvitation {
@@ -241,6 +250,7 @@ model Project {
   webhookSubscriptions WebhookSubscription[]
   customFieldConfigurations CustomFieldProject[]
   customFieldValues CustomFieldValue[]
+  automationRules AutomationRule[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
 
@@ -248,6 +258,62 @@ model Project {
   @@index([workspaceId, archivedAt])
   @@index([leadId])
   @@index([defaultAssigneeId])
+}
+
+model AutomationRule {
+  id String @id @default(cuid())
+  workspaceId String
+  projectId String?
+  name String
+  trigger Json
+  conditions Json
+  actions Json
+  permissions String[]
+  enabled Boolean @default(true)
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jobs AutomationJob[]
+  executions AutomationExecution[]
+  @@index([workspaceId, projectId, enabled])
+}
+model AutomationJob {
+  id String @id @default(cuid())
+  workspaceId String
+  ruleId String
+  eventId String
+  event String
+  payload Json
+  correlationId String
+  depth Int @default(0)
+  status AutomationJobStatus @default(PENDING)
+  attempts Int @default(0)
+  availableAt DateTime @default(now())
+  lockedAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  @@unique([ruleId, eventId])
+  @@index([status, availableAt])
+}
+model AutomationExecution {
+  id String @id @default(cuid())
+  workspaceId String
+  ruleId String
+  jobId String @unique
+  correlationId String
+  input Json
+  result Json
+  durationMs Int
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
+  @@index([ruleId, createdAt])
 }
 
 model ProjectMember {

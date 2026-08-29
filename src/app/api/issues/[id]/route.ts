@@ -8,6 +8,7 @@ import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
 import { enqueueWebhook } from "@/lib/webhooks";
 import { validateCustomFieldWrites } from "@/lib/custom-fields";
 import { evaluateTransition } from "@/lib/workflow";
+import { enqueueAutomation } from "@/lib/automation";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
@@ -117,6 +118,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: existing.watchers.map(({ userId }) => userId) });
     for (const action of execution?.actions ?? []) if (action.type === "NOTIFY" && Array.isArray(action.recipientIds)) await createIssueNotifications(tx, { ...base, type: "ISSUE_UPDATED", recipientIds: action.recipientIds.filter((value): value is string => typeof value === "string") });
     await enqueueWebhook(tx, { workspaceId: project.workspaceId, projectId: project.id, event: "issue.updated", eventId: `issue.updated:${id}:${updated.version}`, data: { id, key: `${project.key}-${existing.number}`, version: updated.version } });
+    await enqueueAutomation(tx, { workspaceId: project.workspaceId, projectId: project.id, event: data.statusId ? "issue.transitioned" : "issue.updated", eventId: `issue.updated:${id}:${updated.version}`, payload: { issueId: id, projectId: project.id, statusId: updated.statusId, priority: updated.priority, labels: labelNames ?? undefined } });
     return customFields.size ? tx.issue.findUniqueOrThrow({ where: { id }, include: issueInclude }) : updated;
   }); } catch (cause) { return NextResponse.json({ error: cause instanceof Error ? cause.message : "Issue could not be updated." }, { status: 400 }); }
   return NextResponse.json({ issue: toUiIssue(issue, project.key) });
