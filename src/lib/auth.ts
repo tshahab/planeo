@@ -2,9 +2,9 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 import { cookies, headers } from "next/headers";
 import { db } from "./db";
 import { logEvent, requestId } from "./observability";
+import { effectiveSessionLifetimeSeconds } from "./enterprise-organization";
 
 const COOKIE_NAME = "planeo_session";
-const SESSION_SECONDS = 60 * 60 * 24 * 7;
 
 interface SessionClaims {
   sessionId: string;
@@ -45,7 +45,8 @@ export function hashPassword(password: string) {
 }
 
 export async function createSession(userId: string, workspaceId: string) {
-  const expiresAt = Date.now() + SESSION_SECONDS * 1000;
+  const sessionSeconds = await effectiveSessionLifetimeSeconds(workspaceId);
+  const expiresAt = Date.now() + sessionSeconds * 1000;
   const session = await db.session.create({ data: { userId, workspaceId, expiresAt: new Date(expiresAt) } });
   const claims: SessionClaims = { sessionId: session.id, userId, workspaceId, expiresAt };
   const encoded = Buffer.from(JSON.stringify(claims)).toString("base64url");
@@ -54,7 +55,7 @@ export async function createSession(userId: string, workspaceId: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: SESSION_SECONDS,
+    maxAge: sessionSeconds,
     path: "/",
   });
 }

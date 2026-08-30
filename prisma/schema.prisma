@@ -13,6 +13,18 @@ enum WorkspaceRole {
   VIEWER
 }
 
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum DomainVerificationStatus {
+  PENDING
+  VERIFIED
+  REVOKED
+}
+
 enum ProjectRole {
   ADMIN
   MEMBER
@@ -161,6 +173,7 @@ model User {
   emailDeliveries EmailDelivery[]
   apiTokens ApiToken[]
   workspacePreferences UserWorkspacePreference[]
+  organizationMemberships OrganizationMember[]
 }
 
 model Workspace {
@@ -191,6 +204,64 @@ model Workspace {
   bulkOperations BulkOperation[]
   chatConnections ChatConnection[]
   userPreferences UserWorkspacePreference[]
+  organizationId String?
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+}
+
+model Organization {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  allowedDomains String[]
+  allowAccountLinking Boolean @default(false)
+  restrictInvitations Boolean @default(false)
+  enforceSso Boolean @default(false)
+  allowLocalLogin Boolean @default(true)
+  allowJitProvisioning Boolean @default(false)
+  sessionLifetimeMinutes Int @default(10080)
+  privilegedReauthMinutes Int @default(15)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspaces Workspace[]
+  members OrganizationMember[]
+  domains OrganizationDomain[]
+
+  @@index([slug])
+}
+
+model OrganizationMember {
+  organizationId String
+  userId String
+  role OrganizationRole @default(MEMBER)
+  breakGlass Boolean @default(false)
+  recoveryConfirmedAt DateTime?
+  joinedAt DateTime @default(now())
+  deactivatedAt DateTime?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@index([userId, deactivatedAt])
+}
+
+model OrganizationDomain {
+  id String @id @default(cuid())
+  organizationId String
+  domain String @unique
+  status DomainVerificationStatus @default(PENDING)
+  challengeHash String
+  challengeExpiresAt DateTime
+  verifiedAt DateTime?
+  verifiedChallengeHash String?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([challengeExpiresAt])
 }
 
 model UserWorkspacePreference {
