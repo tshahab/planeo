@@ -23,6 +23,7 @@
     "webhook:worker": "node ops/webhook-worker.mjs"
     ,"automation:worker": "node ops/automation-worker.mjs"
     ,"bulk:worker": "node ops/bulk-worker.mjs"
+    ,"chat:worker": "node ops/chat-worker.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.9.1",
