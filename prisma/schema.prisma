@@ -116,6 +116,10 @@ enum BulkOperationItemStatus {
   SUCCEEDED
   FAILED
 }
+enum ChatProvider {
+  SLACK
+  TEAMS
+}
 enum DevelopmentProvider {
   GITHUB
   GITLAB
@@ -184,6 +188,49 @@ model Workspace {
   developmentDeliveries DevelopmentWebhookDelivery[]
   realtimeEvents RealtimeEvent[]
   bulkOperations BulkOperation[]
+  chatConnections ChatConnection[]
+}
+
+model ChatConnection {
+  id String @id @default(cuid())
+  workspaceId String
+  projectId String?
+  provider ChatProvider
+  name String
+  channelName String
+  encryptedEndpoint String
+  endpointFingerprint String
+  events String[]
+  detailLevel String @default("STANDARD")
+  enabled Boolean @default(true)
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
+  deliveries ChatDelivery[]
+  @@index([workspaceId, enabled])
+  @@index([projectId])
+}
+
+model ChatDelivery {
+  id String @id @default(cuid())
+  connectionId String
+  eventId String
+  event String
+  payload Json
+  status WebhookDeliveryStatus @default(PENDING)
+  attempts Int @default(0)
+  availableAt DateTime @default(now())
+  lockedAt DateTime?
+  deliveredAt DateTime?
+  responseStatus Int?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  connection ChatConnection @relation(fields:[connectionId], references:[id], onDelete:Cascade)
+  @@unique([connectionId, eventId])
+  @@index([status, availableAt])
+  @@index([connectionId, createdAt])
 }
 
 model BulkOperation {
