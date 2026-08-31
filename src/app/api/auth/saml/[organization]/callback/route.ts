@@ -30,15 +30,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     const workspace = organization.workspaces[0];
     let identity = await db.samlIdentity.findUnique({ where: { organizationId_issuer_nameId: { organizationId: organization.id, issuer: profile.issuer, nameId: profile.nameID } }, include: { user: true } });
     if (!identity) {
-      const domain = claims.email.split("@")[1];
-      const allowed = organization.allowJitProvisioning && domain && organization.domains.some(item => item.domain === domain);
-      if (!allowed || !claims.displayName || await db.user.findUnique({ where: { email: claims.email } })) throw new Error("identity_not_linked");
-      identity = await db.$transaction(async tx => {
-        const user = await tx.user.create({ data: { email: claims.email, name: claims.displayName } });
-        await tx.organizationMember.create({ data: { organizationId: organization.id, userId: user.id, role: "MEMBER" } });
-        await tx.workspaceMember.create({ data: { workspaceId: workspace.id, userId: user.id, role: "MEMBER" } });
-        return tx.samlIdentity.create({ data: { organizationId: organization.id, userId: user.id, issuer: profile.issuer, nameId: profile.nameID, nameIdFormat: profile.nameIDFormat, lastLoginAt: new Date() }, include: { user: true } });
-      });
+      const provisioned = await db.scimIdentity.findUnique({ where: { organizationId_externalId: { organizationId: organization.id, externalId: profile.nameID } }, include: { user: true } });
+      if (provisioned?.active) identity = await db.samlIdentity.create({ data: { organizationId: organization.id, userId: provisioned.userId, issuer: profile.issuer, nameId: profile.nameID, nameIdFormat: profile.nameIDFormat, lastLoginAt: new Date() }, include: { user: true } });
+      else {
+        const domain = claims.email.split("@")[1];
+        const allowed = organization.allowJitProvisioning && domain && organization.domains.some(item => item.domain === domain);
+        if (!allowed || !claims.displayName || await db.user.findUnique({ where: { email: claims.email } })) throw new Error("identity_not_linked");
+        identity = await db.$transaction(async tx => {
+          const user = await tx.user.create({ data: { email: claims.email, name: claims.displayName } });
+          await tx.organizationMember.create({ data: { organizationId: organization.id, userId: user.id, role: "MEMBER" } });
+          await tx.workspaceMember.create({ data: { workspaceId: workspace.id, userId: user.id, role: "MEMBER" } });
+          return tx.samlIdentity.create({ data: { organizationId: organization.id, userId: user.id, issuer: profile.issuer, nameId: profile.nameID, nameIdFormat: profile.nameIDFormat, lastLoginAt: new Date() }, include: { user: true } });
+        });
+      }
     } else {
       const active = await db.organizationMember.findUnique({ where: { organizationId_userId: { organizationId: organization.id, userId: identity.userId } } });
       if (!active || active.deactivatedAt) throw new Error("inactive_identity");
