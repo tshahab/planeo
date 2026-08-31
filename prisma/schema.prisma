@@ -174,6 +174,7 @@ model User {
   apiTokens ApiToken[]
   workspacePreferences UserWorkspacePreference[]
   organizationMemberships OrganizationMember[]
+  samlIdentities SamlIdentity[]
 }
 
 model Workspace {
@@ -227,8 +228,74 @@ model Organization {
   workspaces Workspace[]
   members OrganizationMember[]
   domains OrganizationDomain[]
+  samlConfiguration SamlConfiguration?
+  samlIdentities SamlIdentity[]
+  samlRequests SamlRequest[]
+  samlAssertions SamlAssertionReplay[]
 
   @@index([slug])
+}
+
+model SamlConfiguration {
+  id String @id @default(cuid())
+  organizationId String @unique
+  entityId String
+  entryPoint String
+  idpIssuer String
+  idpCertificates String[]
+  encryptedSpPrivateKey String?
+  spCertificate String?
+  encryptedDecryptionPrivateKey String?
+  decryptionCertificate String?
+  allowIdpInitiated Boolean @default(false)
+  attributeMapping Json
+  enabled Boolean @default(false)
+  testedAt DateTime?
+  lastErrorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model SamlIdentity {
+  id String @id @default(cuid())
+  organizationId String
+  userId String
+  issuer String
+  nameId String
+  nameIdFormat String?
+  lastLoginAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@unique([organizationId, issuer, nameId])
+  @@index([userId])
+}
+
+model SamlRequest {
+  id String @id @default(cuid())
+  organizationId String
+  requestId String @unique
+  relayPath String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, expiresAt])
+}
+
+model SamlAssertionReplay {
+  assertionId String @id
+  organizationId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, expiresAt])
 }
 
 model OrganizationMember {
