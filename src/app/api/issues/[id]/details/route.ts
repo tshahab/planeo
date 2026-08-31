@@ -3,6 +3,7 @@ import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
 import { issueInclude } from "@/lib/issue-query";
+import { canViewIssue } from "@/lib/permissions";
 import { toUiIssue } from "@/lib/issue-mapper";
 import { attachmentDownloadUrl } from "@/lib/storage";
 
@@ -11,7 +12,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { id } = await params;
   const scope = await db.issue.findFirst({ where: { id, workspaceId: context.workspace.id, archivedAt: null }, include: { project: { select: { key: true } } } });
-  if (!scope) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
+  if (!scope || !await canViewIssue(context, id)) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   await getProjectForContext(context, scope.project.key);
   await db.recentIssueView.upsert({ where: { userId_issueId: { userId: context.user.id, issueId: id } }, update: { workspaceId: context.workspace.id }, create: { userId: context.user.id, issueId: id, workspaceId: context.workspace.id } });
 

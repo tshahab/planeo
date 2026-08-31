@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { issueInclude } from "@/lib/issue-query";
 import { toUiIssue } from "@/lib/issue-mapper";
 import { accessibleProjectWhere } from "@/lib/project-query";
+import { issueSecurityWhere } from "@/lib/permissions";
 
 const PAGE_SIZE = 25;
 const priorities = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
     workspaceId: context.workspace.id,
     archivedAt: null,
     parentId: null,
+    AND: [await issueSecurityWhere(context)],
     project: { is: accessibleProjectWhere(context) },
     ...(query ? { OR: [
       { summary: { contains: query, mode: "insensitive" } },

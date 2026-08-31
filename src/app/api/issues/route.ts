@@ -8,6 +8,7 @@ import { enqueueWebhook } from "@/lib/webhooks";
 import { validateCustomFieldWrites } from "@/lib/custom-fields";
 import { enqueueAutomation } from "@/lib/automation";
 import { publishRealtime } from "@/lib/realtime";
+import { issueSecurityWhere, requireProjectPermission } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   const context = await getAuthContext();
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
   const projectKey = searchParams.get("projectKey") ?? "WEB";
   const project = await getProjectForContext(context, projectKey);
+  if (!await requireProjectPermission(context, project.id, "issue.view")) return NextResponse.json({ issues: [] });
   const query = searchParams.get("q")?.trim();
   const issues = await db.issue.findMany({
     where: {
@@ -22,6 +24,7 @@ export async function GET(request: Request) {
       projectId: project.id,
       parentId: null,
       archivedAt: null,
+      AND: [await issueSecurityWhere(context, [project.id])],
       ...(query ? { OR: [
         { summary: { contains: query, mode: "insensitive" } },
         ...(/^WEB-(\d+)$/i.test(query) ? [{ number: Number(query.split("-")[1]) }] : []),
@@ -36,7 +39,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (context.role === "VIEWER") return NextResponse.json({ error: "Viewers cannot create issues." }, { status: 403 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || typeof body.title !== "string" || !body.title.trim() || body.title.trim().length > 200) {
     return NextResponse.json({ error: "Summary is required and must be 200 characters or fewer." }, { status: 400 });
@@ -46,8 +48,7 @@ export async function POST(request: Request) {
 
   const projectKey = typeof body.projectKey === "string" ? body.projectKey : "WEB";
   const project = await getProjectForContext(context, projectKey);
-  const projectMembership = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } });
-  if (projectMembership?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot create issues." }, { status: 403 });
+  if (!await requireProjectPermission(context, project.id, "issue.create")) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   const [status, issueType, reporter, assignee] = await Promise.all([
     db.status.findFirstOrThrow({ where: { projectId: project.id }, orderBy: { position: "asc" } }),
     typeof body.issueTypeId === "string"

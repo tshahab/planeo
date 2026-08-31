@@ -5,6 +5,7 @@ import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
 import { attachmentDownloadUrl, attachmentStorage } from "@/lib/storage";
+import { canViewIssue, requireProjectPermission } from "@/lib/permissions";
 
 const maxBytes = 10 * 1024 * 1024;
 const allowedTypes = new Set(["application/pdf", "application/zip", "application/json", "text/plain", "text/csv"]);
@@ -12,13 +13,11 @@ const allowedTypes = new Set(["application/pdf", "application/zip", "application
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (context.role === "VIEWER") return NextResponse.json({ error: "Viewers cannot upload attachments." }, { status: 403 });
   const { id } = await params;
   const issue = await db.issue.findFirst({ where: { id, workspaceId: context.workspace.id, archivedAt: null }, include: { project: { select: { id: true, key: true } } } });
-  if (!issue) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
+  if (!issue || !await canViewIssue(context, id)) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   const project = await getProjectForContext(context, issue.project.key);
-  const membership = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } });
-  if (membership?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot upload attachments." }, { status: 403 });
+  if (!await requireProjectPermission(context, project.id, "issue.edit")) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");

@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
+import { canViewIssue } from "@/lib/permissions";
 
 async function authorizedIssue(id: string, workspaceId: string, context: NonNullable<Awaited<ReturnType<typeof getAuthContext>>>) {
   const issue = await db.issue.findFirst({ where: { id, workspaceId, archivedAt: null }, include: { project: { select: { key: true } } } });
-  if (!issue) return null;
+  if (!issue || !await canViewIssue(context, id)) return null;
   const project = await getProjectForContext(context, issue.project.key).catch(() => null);
   if (!project) return null;
   return issue;
