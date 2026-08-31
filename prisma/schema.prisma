@@ -175,6 +175,8 @@ model User {
   workspacePreferences UserWorkspacePreference[]
   organizationMemberships OrganizationMember[]
   samlIdentities SamlIdentity[]
+  scimIdentities ScimIdentity[]
+  scimTokensCreated ScimToken[]
 }
 
 model Workspace {
@@ -232,8 +234,107 @@ model Organization {
   samlIdentities SamlIdentity[]
   samlRequests SamlRequest[]
   samlAssertions SamlAssertionReplay[]
+  scimTokens ScimToken[]
+  scimIdentities ScimIdentity[]
+  groups OrganizationGroup[]
+  scimLogs ScimProvisioningLog[]
 
   @@index([slug])
+}
+
+model ScimToken {
+  id String @id @default(cuid())
+  organizationId String
+  createdById String
+  name String
+  prefix String @unique
+  secretHash String @unique
+  scopes String[]
+  expiresAt DateTime?
+  lastUsedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, revokedAt, createdAt])
+}
+
+model ScimIdentity {
+  id String @id @default(cuid())
+  organizationId String
+  userId String
+  externalId String?
+  userName String
+  active Boolean @default(true)
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  groupMemberships OrganizationGroupMember[]
+
+  @@unique([organizationId, userId])
+  @@unique([organizationId, userName])
+  @@unique([organizationId, externalId])
+  @@index([userId])
+}
+
+model OrganizationGroup {
+  id String @id @default(cuid())
+  organizationId String
+  externalId String?
+  displayName String
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members OrganizationGroupMember[]
+  mappings ScimGroupMapping[]
+
+  @@unique([organizationId, displayName])
+  @@unique([organizationId, externalId])
+  @@index([organizationId, updatedAt])
+}
+
+model OrganizationGroupMember {
+  groupId String
+  scimIdentityId String
+  createdAt DateTime @default(now())
+  group OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  scimIdentity ScimIdentity @relation(fields: [scimIdentityId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, scimIdentityId])
+  @@index([scimIdentityId])
+}
+
+model ScimGroupMapping {
+  id String @id @default(cuid())
+  groupId String
+  workspaceId String
+  projectId String?
+  role String
+  createdAt DateTime @default(now())
+  group OrganizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, workspaceId, projectId, role])
+  @@index([workspaceId, projectId])
+}
+
+model ScimProvisioningLog {
+  id BigInt @id @default(autoincrement())
+  organizationId String
+  tokenId String?
+  action String
+  resourceType String
+  resourceId String?
+  status Int
+  errorCode String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
 }
 
 model SamlConfiguration {
