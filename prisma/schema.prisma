@@ -239,8 +239,74 @@ model Organization {
   scimIdentities ScimIdentity[]
   groups OrganizationGroup[]
   scimLogs ScimProvisioningLog[]
+  retentionPolicies RetentionPolicy[]
+  legalHolds LegalHold[]
+  deletionJobs DeletionJob[]
 
   @@index([slug])
+}
+
+model RetentionPolicy {
+  id String @id @default(cuid())
+  organizationId String
+  dataClass String
+  retentionDays Int
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, dataClass])
+}
+
+model LegalHold {
+  id String @id @default(cuid())
+  organizationId String
+  scopeType String
+  scopeId String?
+  reason String
+  ownerId String
+  startsAt DateTime
+  endsAt DateTime?
+  releasedAt DateTime?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events LegalHoldEvent[]
+  @@index([organizationId, releasedAt, startsAt])
+}
+
+model LegalHoldEvent {
+  id BigInt @id @default(autoincrement())
+  legalHoldId String
+  action String
+  actorId String
+  metadata Json?
+  createdAt DateTime @default(now())
+  legalHold LegalHold @relation(fields: [legalHoldId], references: [id], onDelete: Restrict)
+  @@index([legalHoldId, createdAt])
+}
+
+model DeletionJob {
+  id String @id @default(cuid())
+  organizationId String
+  dataClass String
+  cutoff DateTime
+  status String @default("PREVIEWED")
+  scope Json
+  candidateIds Json
+  candidateCount Int
+  previewHash String
+  approvedById String?
+  approvedAt DateTime?
+  attempts Int @default(0)
+  completedAt DateTime?
+  lastError String?
+  evidence Json?
+  evidenceHash String?
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  @@index([organizationId, status, createdAt])
 }
 
 model ScimToken {
