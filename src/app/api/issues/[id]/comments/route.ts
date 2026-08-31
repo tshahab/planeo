@@ -4,17 +4,16 @@ import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
 import { createIssueNotifications, mentionedEmails } from "@/lib/notifications";
 import { enqueueWebhook } from "@/lib/webhooks";
+import { canViewIssue, requireProjectPermission } from "@/lib/permissions";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (context.role === "VIEWER") return NextResponse.json({ error: "Viewers cannot comment." }, { status: 403 });
   const { id } = await params;
   const scope = await db.issue.findFirst({ where: { id, workspaceId: context.workspace.id, archivedAt: null }, include: { project: { select: { key: true } }, watchers: { select: { userId: true } } } });
-  if (!scope) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
+  if (!scope || !await canViewIssue(context, id)) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   const project = await getProjectForContext(context, scope.project.key);
-  const projectMembership = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } });
-  if (projectMembership?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot comment." }, { status: 403 });
+  if (!await requireProjectPermission(context, project.id, "issue.edit")) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
 
   const body = await request.json().catch(() => null) as { body?: unknown } | null;
   const text = typeof body?.body === "string" ? body.body.trim() : "";

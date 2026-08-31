@@ -207,6 +207,7 @@ model Workspace {
   bulkOperations BulkOperation[]
   chatConnections ChatConnection[]
   userPreferences UserWorkspacePreference[]
+  permissionSchemes PermissionScheme[]
   organizationId String?
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
@@ -606,6 +607,7 @@ model Project {
   leadId        String?
   defaultAssigneeId String?
   defaultPriority Priority             @default(MEDIUM)
+  permissionSchemeVersionId String?
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   workspace     Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -628,11 +630,53 @@ model Project {
   automationRules AutomationRule[]
   lead          User?                 @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
+  permissionSchemeVersion PermissionSchemeVersion? @relation(fields: [permissionSchemeVersionId], references: [id], onDelete: Restrict)
+  securityLevels IssueSecurityLevel[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, archivedAt])
   @@index([leadId])
   @@index([defaultAssigneeId])
+  @@index([permissionSchemeVersionId])
+}
+
+model PermissionScheme {
+  id String @id @default(cuid())
+  workspaceId String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  versions PermissionSchemeVersion[]
+
+  @@unique([workspaceId, name])
+}
+
+model PermissionSchemeVersion {
+  id String @id @default(cuid())
+  schemeId String
+  version Int
+  permissions Json
+  createdById String
+  createdAt DateTime @default(now())
+  scheme PermissionScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  projects Project[]
+
+  @@unique([schemeId, version])
+}
+
+model IssueSecurityLevel {
+  id String @id @default(cuid())
+  projectId String
+  name String
+  description String?
+  grants Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues Issue[]
+
+  @@unique([projectId, name])
 }
 
 model AutomationRule {
@@ -786,6 +830,7 @@ model Issue {
   completedAt  DateTime?
   archivedAt   DateTime?
   version      Int             @default(1)
+  securityLevelId String?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -811,11 +856,13 @@ model Issue {
   releases IssueRelease[]
   customFieldValues CustomFieldValue[]
   developmentActivities DevelopmentActivity[]
+  securityLevel IssueSecurityLevel? @relation(fields: [securityLevelId], references: [id], onDelete: Restrict)
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
+  @@index([securityLevelId])
 }
 
 model DevelopmentConnection {

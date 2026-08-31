@@ -10,18 +10,18 @@ import { validateCustomFieldWrites } from "@/lib/custom-fields";
 import { evaluateTransition } from "@/lib/workflow";
 import { enqueueAutomation } from "@/lib/automation";
 import { publishRealtime } from "@/lib/realtime";
+import { canViewIssue, requireProjectPermission } from "@/lib/permissions";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (context.role === "VIEWER") return NextResponse.json({ error: "Viewers cannot update issues." }, { status: 403 });
   const { id } = await params;
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const issueScope = await db.issue.findFirst({ where: { id, workspaceId: context.workspace.id, archivedAt: null }, include: { project: { select: { key: true } } } });
-  if (!issueScope) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
+  if (!issueScope || !await canViewIssue(context, id)) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   const project = await getProjectForContext(context, issueScope.project.key);
+  if (!await requireProjectPermission(context, project.id, "issue.edit")) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   const projectMembership = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: project.id, userId: context.user.id } }, select: { role: true } });
-  if (projectMembership?.role === "VIEWER") return NextResponse.json({ error: "Project viewers cannot update issues." }, { status: 403 });
   const existing = await db.issue.findFirst({ where: { id, workspaceId: project.workspaceId, projectId: project.id, archivedAt: null }, include: { watchers: { select: { userId: true } } } });
   if (!existing) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   if (body?.version !== undefined && (!Number.isInteger(body.version) || Number(body.version) !== existing.version)) return NextResponse.json({ error: "Issue changed since it was loaded. Refresh and retry.", currentVersion: existing.version }, { status: 409 });

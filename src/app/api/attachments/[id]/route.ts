@@ -3,13 +3,14 @@ import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProjectForContext } from "@/lib/issue-query";
 import { attachmentStorage, verifyAttachmentSignature } from "@/lib/storage";
+import { canViewIssue } from "@/lib/permissions";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { id } = await params;
   const attachment = await db.attachment.findFirst({ where: { id, issue: { workspaceId: context.workspace.id, archivedAt: null } }, include: { issue: { include: { project: { select: { key: true } } } } } });
-  if (!attachment) return NextResponse.json({ error: "Attachment not found." }, { status: 404 });
+  if (!attachment || !await canViewIssue(context, attachment.issueId)) return NextResponse.json({ error: "Attachment not found." }, { status: 404 });
   await getProjectForContext(context, attachment.issue.project.key);
   const query = new URL(request.url).searchParams;
   const expires = Number(query.get("expires"));
