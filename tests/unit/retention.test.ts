@@ -1,0 +1,2 @@
+import { describe,expect,it } from "vitest";import { evidenceDigest,validRetentionDays } from "@/lib/retention";
+describe("retention evidence",()=>{it("hashes canonical evidence deterministically",()=>expect(evidenceDigest({b:2,a:{d:4,c:3}})).toBe(evidenceDigest({a:{c:3,d:4},b:2})));it("enforces the audit retention floor",()=>{expect(validRetentionDays("AUDIT_EVENTS",179)).toBe(false);expect(validRetentionDays("AUDIT_EVENTS",180)).toBe(true);expect(validRetentionDays("COMMENTS",1)).toBe(true)})});

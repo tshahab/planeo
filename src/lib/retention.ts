@@ -1,0 +1,45 @@
+import { createHash } from "node:crypto";
+import type { Prisma } from "@prisma/client";
+import { db } from "./db";
+import { attachmentStorage } from "./storage";
+
+export const RETENTION_CLASSES = ["ISSUES","COMMENTS","ATTACHMENTS","NOTIFICATIONS","REALTIME_EVENTS","INTEGRATION_DELIVERIES","AUTOMATION_HISTORY","AUDIT_EVENTS"] as const;
+export type RetentionClass = typeof RETENTION_CLASSES[number];
+type Candidate = { id: string; workspaceId: string; projectId?: string | null; issueId?: string | null; userId?: string | null; objectKey?: string };
+const stable = (value: unknown): unknown => Array.isArray(value) ? value.map(stable) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,stable(item)])) : value;
+const canonical = (value: unknown) => JSON.stringify(stable(value));
+export const evidenceDigest = (value: unknown) => createHash("sha256").update(canonical(value)).digest("hex");
+
+export function validRetentionDays(dataClass: RetentionClass, days: number) { return Number.isInteger(days) && days >= (dataClass === "AUDIT_EVENTS" ? 180 : 1) && days <= 3650; }
+
+async function activeHolds(organizationId: string, now: Date) { return db.legalHold.findMany({ where: { organizationId, releasedAt: null, startsAt: { lte: now }, OR: [{ endsAt: null }, { endsAt: { gt: now } }] } }); }
+function held(candidate: Candidate, holds: Awaited<ReturnType<typeof activeHolds>>) { return holds.some(hold => hold.scopeType === "ORGANIZATION" || hold.scopeType === "WORKSPACE" && hold.scopeId === candidate.workspaceId || hold.scopeType === "PROJECT" && hold.scopeId === candidate.projectId || hold.scopeType === "ISSUE" && hold.scopeId === candidate.issueId || hold.scopeType === "USER" && hold.scopeId === candidate.userId); }
+
+export async function discoverRetention(organizationId: string, dataClass: RetentionClass, cutoff: Date, now = new Date()): Promise<Candidate[]> {
+  const workspace = { organizationId }, candidates: Candidate[] = [];
+  if (dataClass === "ISSUES") (await db.issue.findMany({ where: { workspace: workspace as never, archivedAt: { lt: cutoff } }, select: { id: true, workspaceId: true, projectId: true, reporterId: true } })).forEach(row => candidates.push({ id: row.id, workspaceId: row.workspaceId, projectId: row.projectId, issueId: row.id, userId: row.reporterId }));
+  if (dataClass === "COMMENTS") (await db.comment.findMany({ where: { deletedAt: { lt: cutoff }, issue: { workspace: workspace as never } }, select: { id: true, authorId: true, issue: { select: { id: true, workspaceId: true, projectId: true } } } })).forEach(row => candidates.push({ id: row.id, workspaceId: row.issue.workspaceId, projectId: row.issue.projectId, issueId: row.issue.id, userId: row.authorId }));
+  if (dataClass === "ATTACHMENTS") (await db.attachment.findMany({ where: { createdAt: { lt: cutoff }, issue: { archivedAt: { not: null }, workspace: workspace as never } }, select: { id: true, objectKey: true, issue: { select: { id: true, workspaceId: true, projectId: true } } } })).forEach(row => candidates.push({ id: row.id, objectKey: row.objectKey, workspaceId: row.issue.workspaceId, projectId: row.issue.projectId, issueId: row.issue.id }));
+  if (dataClass === "NOTIFICATIONS") (await db.notification.findMany({ where: { createdAt: { lt: cutoff }, workspace }, select: { id: true, workspaceId: true, userId: true, issueId: true, issue: { select: { projectId: true } } } })).forEach(row => candidates.push({ id: row.id, workspaceId: row.workspaceId, projectId: row.issue?.projectId, issueId: row.issueId, userId: row.userId }));
+  if (dataClass === "REALTIME_EVENTS") (await db.realtimeEvent.findMany({ where: { createdAt: { lt: cutoff }, workspace }, select: { id: true, workspaceId: true, projectId: true, resourceId: true, type: true } })).forEach(row => candidates.push({ id: row.id.toString(), workspaceId: row.workspaceId, projectId: row.projectId, issueId: row.type.startsWith("issue.") ? row.resourceId : null }));
+  if (dataClass === "INTEGRATION_DELIVERIES") (await db.webhookDelivery.findMany({ where: { updatedAt: { lt: cutoff }, subscription: { workspace } }, select: { id: true, subscription: { select: { workspaceId: true, projectId: true } } } })).forEach(row => candidates.push({ id: row.id, workspaceId: row.subscription.workspaceId, projectId: row.subscription.projectId }));
+  if (dataClass === "AUTOMATION_HISTORY") (await db.automationExecution.findMany({ where: { createdAt: { lt: cutoff }, workspace }, select: { id: true, workspaceId: true, rule: { select: { projectId: true } } } })).forEach(row => candidates.push({ id: row.id, workspaceId: row.workspaceId, projectId: row.rule.projectId }));
+  if (dataClass === "AUDIT_EVENTS") (await db.auditEvent.findMany({ where: { createdAt: { lt: cutoff }, workspace }, select: { id: true, workspaceId: true, actorId: true } })).forEach(row => candidates.push({ id: row.id, workspaceId: row.workspaceId, userId: row.actorId }));
+  const holds = await activeHolds(organizationId, now); return candidates.filter(candidate => !held(candidate, holds)).sort((a,b) => a.id.localeCompare(b.id));
+}
+
+export async function previewDeletion(input: { organizationId: string; dataClass: RetentionClass; cutoff: Date; createdById: string; scope?: Prisma.InputJsonValue; now?: Date }) { const candidates = await discoverRetention(input.organizationId, input.dataClass, input.cutoff, input.now); const candidateIds = candidates.map(item => item.id); const scope = input.scope ?? {}; const previewHash = evidenceDigest({ organizationId: input.organizationId, dataClass: input.dataClass, cutoff: input.cutoff.toISOString(), scope, candidateIds }); return db.deletionJob.create({ data: { organizationId: input.organizationId, dataClass: input.dataClass, cutoff: input.cutoff, scope, candidateIds, candidateCount: candidateIds.length, previewHash, createdById: input.createdById } }); }
+
+export async function executeDeletion(jobId: string, now = new Date()) { const job = await db.deletionJob.findUniqueOrThrow({ where: { id: jobId } }); if (job.status === "COMPLETED") return job; if (!job.approvedAt || !["APPROVED","RUNNING","FAILED"].includes(job.status)) throw new Error("approved_job_required"); const allowed = new Set((await discoverRetention(job.organizationId, job.dataClass as RetentionClass, job.cutoff, now)).map(item => item.id)), ids = (job.candidateIds as string[]).filter(id => allowed.has(id)); await db.deletionJob.update({ where: { id: job.id }, data: { status: "RUNNING", attempts: { increment: 1 }, lastError: null } }); try { let count = 0;
+    if (job.dataClass === "ATTACHMENTS") { const rows = await db.attachment.findMany({ where: { id: { in: ids } }, select: { id: true, objectKey: true } }); for (const row of rows) { await attachmentStorage.delete(row.objectKey); count += (await db.attachment.deleteMany({ where: { id: row.id } })).count; } }
+    else if (job.dataClass === "ISSUES") count = (await db.issue.deleteMany({ where: { id: { in: ids } } })).count;
+    else if (job.dataClass === "COMMENTS") count = (await db.comment.deleteMany({ where: { id: { in: ids } } })).count;
+    else if (job.dataClass === "NOTIFICATIONS") count = (await db.notification.deleteMany({ where: { id: { in: ids } } })).count;
+    else if (job.dataClass === "REALTIME_EVENTS") count = (await db.realtimeEvent.deleteMany({ where: { id: { in: ids.map(BigInt) } } })).count;
+    else if (job.dataClass === "INTEGRATION_DELIVERIES") count = (await db.webhookDelivery.deleteMany({ where: { id: { in: ids } } })).count;
+    else if (job.dataClass === "AUTOMATION_HISTORY") count = (await db.automationExecution.deleteMany({ where: { id: { in: ids } } })).count;
+    else if (job.dataClass === "AUDIT_EVENTS") count = (await db.auditEvent.deleteMany({ where: { id: { in: ids } } })).count;
+    const evidence = { jobId: job.id, previewHash: job.previewHash, candidateCount: job.candidateCount, eligibleAtExecution: ids.length, deletedCount: count, completedAt: now.toISOString() }, evidenceHash = evidenceDigest(evidence); return db.deletionJob.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: now, evidence, evidenceHash } });
+  } catch (error) { await db.deletionJob.update({ where: { id: job.id }, data: { status: "FAILED", lastError: String(error).slice(0,500) } }); throw error; } }
+
+export async function anonymizeUser(organizationId: string, userId: string) { const heldUser = await activeHolds(organizationId, new Date()).then(holds => holds.some(hold => hold.scopeType === "ORGANIZATION" || hold.scopeType === "USER" && hold.scopeId === userId)); if (heldUser) throw new Error("user_is_held"); const digest = createHash("sha256").update(`${organizationId}:${userId}`).digest("hex").slice(0,20); return db.user.update({ where: { id: userId }, data: { email: `deleted-${digest}@anonymized.invalid`, name: "Deleted user", avatarUrl: null, emailNotifications: false, inAppNotifications: false } }); }
