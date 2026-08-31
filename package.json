@@ -20,14 +20,16 @@
     "test:e2e": "playwright test",
     "maintenance": "node ops/maintenance.mjs",
     "email:worker": "node ops/email-worker.mjs",
-    "webhook:worker": "node ops/webhook-worker.mjs"
-    ,"automation:worker": "node ops/automation-worker.mjs"
-    ,"bulk:worker": "node ops/bulk-worker.mjs"
-    ,"chat:worker": "node ops/chat-worker.mjs"
+    "webhook:worker": "node ops/webhook-worker.mjs",
+    "automation:worker": "node ops/automation-worker.mjs",
+    "bulk:worker": "node ops/bulk-worker.mjs",
+    "chat:worker": "node ops/chat-worker.mjs"
   },
   "dependencies": {
+    "@node-saml/node-saml": "^5.1.0",
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
+    "fast-xml-parser": "^5.11.1",
     "lucide-react": "1.31.0",
     "next": "16.3.1",
     "pg": "8.23.0",
@@ -44,6 +46,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.1",
     "prisma": "7.9.1",
+    "samlify": "^2.13.1",
     "typescript": "6.0.3",
     "vitest": "^4.1.11"
   },
