@@ -60,6 +60,13 @@ enum Priority {
 enum ProjectTemplate {
   KANBAN
   SCRUM
+  SERVICE
+}
+
+enum RequestTypeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum SprintState {
@@ -700,6 +707,8 @@ model Project {
   defaultAssignee User?               @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
   permissionSchemeVersion PermissionSchemeVersion? @relation(fields: [permissionSchemeVersionId], references: [id], onDelete: Restrict)
   securityLevels IssueSecurityLevel[]
+  portalGroups PortalGroup[]
+  requestTypes RequestType[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, archivedAt])
@@ -823,6 +832,7 @@ model IssueType {
   position  Int
   project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issues    Issue[]
+  requestTypes RequestType[]
 
   @@unique([projectId, name])
 }
@@ -839,6 +849,7 @@ model Status {
   columns   BoardColumn[]
   outgoingTransitions WorkflowTransition[] @relation("TransitionFrom")
   incomingTransitions WorkflowTransition[] @relation("TransitionTo")
+  requestTypes RequestType[]
 
   @@unique([projectId, name])
 }
@@ -899,6 +910,7 @@ model Issue {
   archivedAt   DateTime?
   version      Int             @default(1)
   securityLevelId String?
+  requestTypeVersionId String?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -925,12 +937,67 @@ model Issue {
   customFieldValues CustomFieldValue[]
   developmentActivities DevelopmentActivity[]
   securityLevel IssueSecurityLevel? @relation(fields: [securityLevelId], references: [id], onDelete: Restrict)
+  requestTypeVersion RequestTypeVersion? @relation(fields: [requestTypeVersionId], references: [id], onDelete: Restrict)
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
   @@index([securityLevelId])
+  @@index([requestTypeVersionId])
+}
+
+model PortalGroup {
+  id String @id @default(cuid())
+  projectId String
+  name String
+  description String?
+  position Int @default(0)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestTypes RequestType[]
+
+  @@unique([projectId, name])
+  @@index([projectId, position])
+}
+
+model RequestType {
+  id String @id @default(cuid())
+  projectId String
+  portalGroupId String?
+  issueTypeId String
+  initialStatusId String
+  name String
+  description String?
+  icon String?
+  position Int @default(0)
+  status RequestTypeStatus @default(DRAFT)
+  draftSchema Json
+  publishedVersion Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  portalGroup PortalGroup? @relation(fields: [portalGroupId], references: [id], onDelete: SetNull)
+  issueType IssueType @relation(fields: [issueTypeId], references: [id], onDelete: Restrict)
+  initialStatus Status @relation(fields: [initialStatusId], references: [id], onDelete: Restrict)
+  versions RequestTypeVersion[]
+
+  @@unique([projectId, name])
+  @@index([projectId, status, position])
+  @@index([portalGroupId, position])
+}
+
+model RequestTypeVersion {
+  id String @id @default(cuid())
+  requestTypeId String
+  version Int
+  schema Json
+  createdById String
+  publishedAt DateTime @default(now())
+  requestType RequestType @relation(fields: [requestTypeId], references: [id], onDelete: Cascade)
+  issues Issue[]
+
+  @@unique([requestTypeId, version])
+  @@index([requestTypeId, publishedAt])
 }
 
 model DevelopmentConnection {

@@ -7,8 +7,9 @@ import { burndown, cumulativeFlow } from "@/lib/delivery-reports";
 export async function GET(request: Request, { params }: { params: Promise<{ key: string }> }) {
   const context = await getAuthContext(); if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 }); const project = await getProjectForContext(context, (await params).key).catch(() => null); if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   const search = new URL(request.url).searchParams; const to = parseDay(search.get("to")) ?? endOfUtcDay(new Date()); const from = parseDay(search.get("from")) ?? new Date(to.getTime() - 29 * 86_400_000); if (from > to || to.getTime() - from.getTime() > 89 * 86_400_000) return NextResponse.json({ error: "Choose a valid UTC date range of at most 90 days." }, { status: 400 });
+  const requestTypeId = search.get("requestTypeId");
   const [histories, completed, active] = await Promise.all([
-    db.issueHistory.findMany({ where: { projectId: project.id, workspaceId: context.workspace.id, occurredAt: { lte: to }, issue: { archivedAt: null } }, orderBy: { occurredAt: "asc" }, take: 100_000 }),
+    db.issueHistory.findMany({ where: { projectId: project.id, workspaceId: context.workspace.id, occurredAt: { lte: to }, issue: { archivedAt: null, ...(requestTypeId ? { requestTypeVersion: { is: { requestTypeId } } } : {}) } }, orderBy: { occurredAt: "asc" }, take: 100_000 }),
     db.sprint.findMany({ where: { projectId: project.id, state: "COMPLETED" }, orderBy: { completedAt: "desc" }, take: 12, select: { id: true, name: true, completedAt: true, totalIssueCount: true, completedIssueCount: true, totalEstimate: true, completedEstimate: true, snapshotIssues: { select: { estimate: true } } } }),
     db.sprint.findFirst({ where: { projectId: project.id, state: "ACTIVE" }, include: { issues: { include: { issue: { select: { id: true, estimate: true } } } } } }),
   ]);

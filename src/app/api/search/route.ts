@@ -47,6 +47,7 @@ export async function GET(request: Request) {
     ...(params.get("label") ? { labels: { some: { labelId: params.get("label")! } } } : {}),
     ...(params.get("sprint") ? { sprintIssues: { some: { sprintId: params.get("sprint")! } } } : {}),
     ...(params.get("release") ? { releases: { some: { releaseId: params.get("release")! } } } : {}),
+    ...(params.get("requestTypeId") ? { requestTypeVersion: { is: { requestTypeId: params.get("requestTypeId")! } } } : {}),
     ...(customFieldId ? { customFieldValues: { some: { fieldId: customFieldId, field: { workspaceId: context.workspace.id }, ...(customFieldValue === undefined ? {} : { value: { equals: customFieldValue } }) } } } : {}),
     ...(params.get("overdue") === "true" ? { dueDate: { lt: new Date() }, status: { category: { not: "DONE" } } } : {}),
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
