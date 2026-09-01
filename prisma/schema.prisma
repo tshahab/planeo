@@ -208,6 +208,8 @@ model Workspace {
   chatConnections ChatConnection[]
   userPreferences UserWorkspacePreference[]
   permissionSchemes PermissionScheme[]
+  auditExports AuditExport[]
+  auditChainAnchor AuditChainAnchor?
   organizationId String?
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
@@ -1377,9 +1379,40 @@ model AuditEvent {
   targetId    String?
   metadata    Json?
   createdAt   DateTime  @default(now())
+  sequence BigInt @default(dbgenerated())
+  previousHash String?
+  eventHash String @default(dbgenerated())
+  keyVersion Int @default(1)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
+  @@unique([workspaceId, sequence])
+}
+
+model AuditExport {
+  id String @id @default(cuid())
+  workspaceId String
+  requestedById String
+  format String
+  filters Json
+  status String @default("PENDING")
+  objectKey String?
+  manifest Json?
+  checksum String?
+  expiresAt DateTime
+  lastError String?
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
+}
+
+model AuditChainAnchor {
+  workspaceId String @id
+  sequence BigInt
+  eventHash String
+  anchoredAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model ApiToken {
