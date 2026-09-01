@@ -18,12 +18,14 @@ export async function GET(request: Request) {
   const project = await getProjectForContext(context, projectKey);
   if (!await requireProjectPermission(context, project.id, "issue.view")) return NextResponse.json({ issues: [] });
   const query = searchParams.get("q")?.trim();
+  const requestTypeId = searchParams.get("requestTypeId")?.trim();
   const issues = await db.issue.findMany({
     where: {
       workspaceId: project.workspaceId,
       projectId: project.id,
       parentId: null,
       archivedAt: null,
+      ...(requestTypeId ? { requestTypeVersion: { is: { requestTypeId } } } : {}),
       AND: [await issueSecurityWhere(context, [project.id])],
       ...(query ? { OR: [
         { summary: { contains: query, mode: "insensitive" } },
