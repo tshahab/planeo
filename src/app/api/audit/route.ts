@@ -23,6 +23,7 @@ export async function GET(request: Request) {
   ]);
   const actorIds = [...new Set(events.map(event => event.actorId).filter(Boolean) as string[])];
   const eventActors = await db.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true, email: true } }); const actorMap = new Map(eventActors.map(actor => [actor.id, actor]));
+  await db.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "audit.read", targetType: "audit_log", metadata: { page, pageSize, filtered: Boolean(actorId || action || targetType || from || to) } } });
   return NextResponse.json({ events: events.map(event => ({ ...event, metadata: redactAuditMetadata(event.metadata), actor: event.actorId ? actorMap.get(event.actorId) ?? null : null })), page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), filters: { actors: actors.map(item => item.user), actions: actions.map(item => item.action), targetTypes: targetTypes.map(item => item.targetType) } });
 }
 function date(value: string | null, end: boolean) { if (!value) return null; if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null; const result = new Date(`${value}T${end ? "23:59:59.999" : "00:00:00.000"}Z`); return Number.isNaN(result.getTime()) ? null : result; }
