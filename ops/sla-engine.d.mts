@@ -1,0 +1,10 @@
+export type Calendar = { timezone: string; week: number[][][]; holidays: string[]; exceptions: Record<string, number[][]> };
+export type Condition = { field: string; equals: string | number | boolean };
+export type Rules = { start: Condition[]; pause: { id: string; when: Condition[] }[]; resume: Condition[]; stop: Condition[]; reset: Condition[]; success: Condition[] };
+export function validateCalendar(value: unknown): Calendar;
+export function validateConditions(value: unknown): Condition[];
+export function validateRules(value: unknown, metric: string): Rules;
+export function matches(conditions: Condition[], payload: Record<string, unknown>): boolean;
+export function businessMilliseconds(config: Calendar, from: Date | string | number, to: Date | string | number): number;
+export function businessThreshold(config: Calendar, from: Date | string | number, to: Date | string | number, amount: number): Date | null;
+export function accrue(config: Calendar, cycle: { lastAt: Date | string; elapsedMs: number | bigint; endedAt?: Date | string | null; pauseReasons: string[]; riskAt?: Date | string | null; breachedAt?: Date | string | null }, at: Date | string, targetMs: number, riskMs: number): { elapsedMs: number; lastAt: Date; events: { type: string; at: Date }[] };

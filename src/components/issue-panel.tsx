@@ -4,6 +4,7 @@ import { Bell, CalendarDays, ChevronDown, Clock3, Link2, MoreHorizontal, Papercl
 import { useEffect, useState } from "react";
 import type { Issue, Person, ProjectStatus, Status } from "@/lib/types";
 import { Avatar } from "./workspace-app";
+import { SlaTargets } from "./sla-targets";
 
 export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUpdate, onArchive, readOnly = false }: { issue: Issue; statuses: ProjectStatus[]; currentUser: Person; onClose: () => void; onMove: (status: Status) => void; onUpdate: (changes: Record<string, unknown>) => Promise<void>; onArchive?: () => Promise<void>; readOnly?: boolean }) {
   const people = [currentUser];
@@ -116,6 +117,7 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
         <header className="panel-header"><div className="panel-key"><span>{issue.key.split("-")[0]}</span><span>/</span><strong>{issue.key}</strong></div><div><button aria-label={watching ? "Stop watching issue" : "Watch issue"} aria-pressed={watching} onClick={() => void toggleWatching()}><Bell size={17} fill={watching ? "currentColor" : "none"} /></button><button aria-label="Copy link"><Link2 size={17} /></button>{onArchive && <button aria-label="Archive issue" onClick={() => window.confirm(`Archive ${issue.key}?`) && void onArchive()}><MoreHorizontal size={18} /></button>}<button aria-label="Close" onClick={onClose}><X size={20} /></button></div></header>
         <div className="panel-body">
           <main className="issue-main">
+            <SlaTargets endpoint={`/api/issues/${issue.id}/sla`} agent={!readOnly} />
             <div className="issue-type-line"><span className={`type-pill ${issue.type.toLowerCase()}`}>{issue.type}</span><span>Created {issue.createdAt ? formatTime(issue.createdAt) : "recently"}</span></div>
             {readOnly ? <h2>{issue.title}</h2> : <input className="issue-title-input" aria-label="Issue title" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} />}
             <section className="description-section"><h3>Description</h3>{readOnly ? <p>{issue.description}</p> : <><textarea className="issue-description-input" aria-label="Issue description" value={description} maxLength={20000} onChange={(event) => setDescription(event.target.value)} /><button className="secondary-button issue-save-button" disabled={savingDetails || !title.trim() || (title === issue.title && description === issue.description)} onClick={saveDetails}>{savingDetails ? "Saving…" : "Save details"}</button></>}</section>

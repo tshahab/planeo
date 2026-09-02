@@ -7,9 +7,9 @@ import type { QueueDefinition, QueueRow } from "@/lib/service-queues";
 type Option = { id: string; name: string };
 type Queue = { id: string; name: string; ownerId: string; visibility: string; version: number; position: number; isDefault: boolean; definition: QueueDefinition };
 type Snapshot = { snapshotId: string; createdAt: string; definition: QueueDefinition; rows: QueueRow[]; metrics: { total: number; unassigned: number; aging: number; slaRisk: number; recentCustomerResponses: number; workload: Record<string, number> } };
-const columns = ["summary", "status", "priority", "assignee", "requestType", "organization", "createdAt", "updatedAt", "slaState", "customerResponse"];
+const columns = ["summary", "status", "priority", "assignee", "requestType", "organization", "createdAt", "updatedAt", "slaState", "slaGoal", "slaRemaining", "customerResponse"];
 const initial: QueueDefinition = { filters: {}, columns: ["summary", "status", "priority", "assignee", "slaState"], grouping: "none", sort: "createdAt", direction: "asc" };
-const label: Record<string, string> = { summary: "Summary", status: "Status", priority: "Priority", assignee: "Assignee", requestType: "Request type", organization: "Organization", createdAt: "Created", updatedAt: "Updated", slaState: "SLA state", customerResponse: "Latest customer response" };
+const label: Record<string, string> = { summary: "Summary", status: "Status", priority: "Priority", assignee: "Assignee", requestType: "Request type", organization: "Organization", createdAt: "Created", updatedAt: "Updated", slaState: "SLA state", slaGoal: "SLA goal", slaRemaining: "SLA remaining time", customerResponse: "Latest customer response" };
 
 export function ServiceQueues({ projectKey, userId, canAdmin, canEdit, options }: { projectKey: string; userId: string; canAdmin: boolean; canEdit: boolean; options: { statuses: Option[]; requestTypes: Option[]; people: Option[]; organizations: Option[]; labels: Option[] } }) {
   const base = `/api/projects/${projectKey}/queues`;
