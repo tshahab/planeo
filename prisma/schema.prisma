@@ -151,6 +151,18 @@ enum DevelopmentActivityKind {
   BUILD
 }
 
+enum ServiceRequestSharing {
+  PRIVATE
+  PARTICIPANTS
+  ORGANIZATION
+}
+
+enum PortalTokenPurpose {
+  INVITATION
+  EMAIL_VERIFICATION
+  PASSWORD_RECOVERY
+}
+
 model User {
   id                      String                    @id @default(cuid())
   email                   String                    @unique
@@ -185,6 +197,7 @@ model User {
   scimIdentities          ScimIdentity[]
   scimTokensCreated       ScimToken[]
   serviceRequestUploads   ServiceRequestUpload[]
+  portalCustomer          PortalCustomer?           @relation("PortalBackingUser")
 }
 
 model Workspace {
@@ -218,6 +231,10 @@ model Workspace {
   permissionSchemes      PermissionScheme[]
   auditExports           AuditExport[]
   auditChainAnchor       AuditChainAnchor?
+  portalBranding         PortalBranding?
+  portalCustomers        PortalCustomer[]
+  customerOrganizations  CustomerOrganization[]
+  portalNotifications    PortalNotification[]
   organizationId         String?
   organization           Organization?                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
@@ -681,22 +698,22 @@ model PasswordResetToken {
 }
 
 model Project {
-  id                        String                   @id @default(cuid())
+  id                        String                      @id @default(cuid())
   workspaceId               String
   name                      String
   key                       String
   description               String?
-  visibility                ProjectVisibility        @default(PUBLIC)
-  template                  ProjectTemplate          @default(KANBAN)
-  issueSequence             Int                      @default(0)
+  visibility                ProjectVisibility           @default(PUBLIC)
+  template                  ProjectTemplate             @default(KANBAN)
+  issueSequence             Int                         @default(0)
   archivedAt                DateTime?
   leadId                    String?
   defaultAssigneeId         String?
-  defaultPriority           Priority                 @default(MEDIUM)
+  defaultPriority           Priority                    @default(MEDIUM)
   permissionSchemeVersionId String?
-  createdAt                 DateTime                 @default(now())
-  updatedAt                 DateTime                 @updatedAt
-  workspace                 Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  workspace                 Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members                   ProjectMember[]
   issueTypes                IssueType[]
   statuses                  Status[]
@@ -714,14 +731,16 @@ model Project {
   customFieldConfigurations CustomFieldProject[]
   customFieldValues         CustomFieldValue[]
   automationRules           AutomationRule[]
-  lead                      User?                    @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
-  defaultAssignee           User?                    @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
-  permissionSchemeVersion   PermissionSchemeVersion? @relation(fields: [permissionSchemeVersionId], references: [id], onDelete: Restrict)
+  lead                      User?                       @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
+  defaultAssignee           User?                       @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
+  permissionSchemeVersion   PermissionSchemeVersion?    @relation(fields: [permissionSchemeVersionId], references: [id], onDelete: Restrict)
   securityLevels            IssueSecurityLevel[]
   portalGroups              PortalGroup[]
   requestTypes              ServiceRequestType[]
   serviceRequests           ServiceRequest[]
   serviceRequestUploads     ServiceRequestUpload[]
+  portalOrganizations       PortalProjectOrganization[]
+  portalCustomers           PortalProjectCustomer[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, archivedAt])
@@ -1024,22 +1043,32 @@ model ServiceRequestTypeVersion {
 }
 
 model ServiceRequest {
-  id                   String                    @id @default(cuid())
-  workspaceId          String
-  projectId            String
-  issueId              String                    @unique
-  requestTypeId        String
-  requestTypeVersionId String
-  submittedValues      Json
-  renderedSchema       Json
-  consentAcceptedAt    DateTime?
-  createdAt            DateTime                  @default(now())
-  project              Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  issue                Issue                     @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  requestType          ServiceRequestType        @relation(fields: [requestTypeId], references: [id], onDelete: Restrict)
-  requestTypeVersion   ServiceRequestTypeVersion @relation(fields: [requestTypeVersionId], references: [id], onDelete: Restrict)
+  id                     String                      @id @default(cuid())
+  workspaceId            String
+  projectId              String
+  issueId                String                      @unique
+  requestTypeId          String
+  requestTypeVersionId   String
+  submittedValues        Json
+  renderedSchema         Json
+  consentAcceptedAt      DateTime?
+  customerReporterId     String?
+  customerOrganizationId String?
+  sharing                ServiceRequestSharing       @default(PRIVATE)
+  createdAt              DateTime                    @default(now())
+  project                Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issue                  Issue                       @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  requestType            ServiceRequestType          @relation(fields: [requestTypeId], references: [id], onDelete: Restrict)
+  requestTypeVersion     ServiceRequestTypeVersion   @relation(fields: [requestTypeVersionId], references: [id], onDelete: Restrict)
+  customerReporter       PortalCustomer?             @relation(fields: [customerReporterId], references: [id], onDelete: Restrict)
+  customerOrganization   CustomerOrganization?       @relation(fields: [customerOrganizationId], references: [id], onDelete: Restrict)
+  participants           ServiceRequestParticipant[]
+  portalComments         PortalComment[]
+  portalNotifications    PortalNotification[]
 
   @@index([workspaceId, projectId, requestTypeId, createdAt])
+  @@index([customerReporterId, createdAt])
+  @@index([customerOrganizationId, sharing, createdAt])
 }
 
 model ServiceRequestUpload {
@@ -1060,6 +1089,162 @@ model ServiceRequestUpload {
   uploadedBy    User               @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, uploadedById, expiresAt, usedAt])
+}
+
+model PortalBranding {
+  workspaceId  String    @id
+  portalName   String
+  helpText     String?
+  logoUrl      String?
+  primaryColor String    @default("#3157d5")
+  locale       String    @default("en")
+  customDomain String?  @unique
+  updatedAt    DateTime  @updatedAt
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model PortalCustomer {
+  id                  String                       @id @default(cuid())
+  workspaceId         String
+  issueReporterUserId String                       @unique
+  email               String
+  name                String
+  passwordHash        String?
+  verifiedAt          DateTime?
+  deactivatedAt       DateTime?
+  locale              String                       @default("en")
+  emailNotifications  Boolean                      @default(true)
+  enterpriseSubject   String?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  workspace           Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  issueReporterUser   User                         @relation("PortalBackingUser", fields: [issueReporterUserId], references: [id], onDelete: Restrict)
+  sessions            PortalCustomerSession[]
+  tokens              PortalCustomerToken[]
+  organizations       CustomerOrganizationMember[]
+  reportedRequests    ServiceRequest[]
+  participants        ServiceRequestParticipant[]
+  comments            PortalComment[]
+  notifications       PortalNotification[]
+  projects            PortalProjectCustomer[]
+
+  @@unique([workspaceId, email])
+  @@unique([workspaceId, enterpriseSubject])
+  @@index([workspaceId, deactivatedAt])
+}
+
+model PortalCustomerSession {
+  id          String         @id @default(cuid())
+  customerId  String
+  workspaceId String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  customer    PortalCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, revokedAt, expiresAt])
+  @@index([workspaceId, expiresAt])
+}
+
+model PortalCustomerToken {
+  id         String             @id @default(cuid())
+  customerId String
+  tokenHash  String             @unique
+  purpose    PortalTokenPurpose
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime           @default(now())
+  customer   PortalCustomer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, purpose, expiresAt])
+}
+
+model CustomerOrganization {
+  id          String                       @id @default(cuid())
+  workspaceId String
+  name        String
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+  workspace   Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     CustomerOrganizationMember[]
+  projects    PortalProjectOrganization[]
+  requests    ServiceRequest[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model CustomerOrganizationMember {
+  organizationId String
+  customerId     String
+  active         Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  organization   CustomerOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       PortalCustomer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, customerId])
+  @@index([customerId, active])
+}
+
+model PortalProjectOrganization {
+  projectId      String
+  organizationId String
+  enabled        Boolean              @default(true)
+  project        Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization   CustomerOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, organizationId])
+  @@index([organizationId, enabled])
+}
+
+model PortalProjectCustomer {
+  projectId  String
+  customerId String
+  enabled    Boolean        @default(true)
+  project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  customer   PortalCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, customerId])
+  @@index([customerId, enabled])
+}
+
+model ServiceRequestParticipant {
+  requestId  String
+  customerId String
+  addedAt    DateTime       @default(now())
+  request    ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  customer   PortalCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, customerId])
+  @@index([customerId])
+}
+
+model PortalComment {
+  id         String         @id @default(cuid())
+  requestId  String
+  customerId String
+  body       String
+  createdAt  DateTime       @default(now())
+  request    ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  customer   PortalCustomer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
+}
+
+model PortalNotification {
+  id          String          @id @default(cuid())
+  workspaceId String
+  customerId  String
+  requestId   String?
+  type        String
+  message     String
+  readAt      DateTime?
+  createdAt   DateTime        @default(now())
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customer    PortalCustomer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  request     ServiceRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, readAt, createdAt])
 }
 
 model DevelopmentConnection {
@@ -1332,6 +1517,7 @@ model Attachment {
   fileName    String
   objectKey   String   @unique
   contentType String
+  portalVisible Boolean @default(false)
   size        Int
   createdAt   DateTime @default(now())
   issue       Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)

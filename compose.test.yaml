@@ -137,6 +137,7 @@ services:
       - ./playwright-report:/app/playwright-report
     environment:
       PLAYWRIGHT_BASE_URL: http://test-app:3000
+      DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
       CI: "1"
       PNPM_HOME: /pnpm
       npm_config_store_dir: /pnpm/store
