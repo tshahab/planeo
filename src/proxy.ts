@@ -10,15 +10,17 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-request-id", correlationId);
   if (!writeMethods.has(request.method)) return NextResponse.next({ request: { headers: requestHeaders }, headers: { "X-Request-Id": correlationId } });
   const client = requestClientKey(request);
-  const isIdentity = request.nextUrl.pathname.startsWith("/api/auth/") && request.nextUrl.pathname !== "/api/auth/logout";
+  const isIdentity = request.nextUrl.pathname.startsWith("/api/auth/") && request.nextUrl.pathname !== "/api/auth/logout" || request.nextUrl.pathname.startsWith("/api/portal/auth/") && request.nextUrl.pathname !== "/api/portal/auth/logout";
+  const isPortalWrite = request.nextUrl.pathname.startsWith("/api/portal/") || request.nextUrl.pathname.startsWith("/api/service/forms/") && Boolean(request.cookies.get("planeo_portal_session"));
   const identityLimit = Number(process.env.IDENTITY_RATE_LIMIT ?? 10);
-  const limit = await consumeRateLimit(`${isIdentity ? "identity" : "write"}:${client}`, isIdentity ? identityLimit : 120, isIdentity ? 15 * 60 : 60);
+  const bucket = isIdentity ? "identity" : isPortalWrite ? "portal-write" : "write";
+  const limit = await consumeRateLimit(`${bucket}:${client}`, isIdentity ? identityLimit : isPortalWrite ? 30 : 120, isIdentity ? 15 * 60 : 60);
   if (!limit.allowed) {
     logEvent("warn", "request.rate_limited", { requestId: correlationId, path: request.nextUrl.pathname, method: request.method });
     return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429, headers: { "Retry-After": String(Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000))), "X-Request-Id": correlationId } });
   }
 
-  if (request.cookies.has("planeo_session")) {
+  if (request.cookies.has("planeo_session") || request.cookies.has("planeo_portal_session")) {
     const origin = request.headers.get("origin");
     const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
     const protocol = request.headers.get("x-forwarded-proto") || request.nextUrl.protocol.replace(":", "");
