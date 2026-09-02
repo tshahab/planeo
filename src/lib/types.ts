@@ -42,7 +42,7 @@ export interface ProjectSummary {
   key: string;
   name: string;
   description?: string;
-  template: "KANBAN" | "SCRUM";
+  template: "KANBAN" | "SCRUM" | "SERVICE";
   visibility: "PUBLIC" | "PRIVATE";
 }
 

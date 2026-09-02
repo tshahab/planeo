@@ -2,7 +2,7 @@ import type { AuthContext } from "./auth";
 import { db } from "./db";
 import { accessibleProjectWhere } from "./project-query";
 
-const allowed = ["q", "project", "type", "status", "assignee", "reporter", "priority", "label", "sprint", "from", "to", "sort"] as const;
+const allowed = ["q", "project", "type", "status", "assignee", "reporter", "priority", "label", "sprint", "requestType", "from", "to", "sort"] as const;
 export type SavedQuery = Partial<Record<typeof allowed[number], string>>;
 
 export function normalizeSavedQuery(value: unknown): SavedQuery | null {
@@ -24,6 +24,7 @@ export async function validateSavedQuery(context: AuthContext, query: SavedQuery
     query.reporter ? db.workspaceMember.count({ where: { workspaceId: context.workspace.id, userId: query.reporter } }) : 1,
     query.label ? db.label.count({ where: { workspaceId: context.workspace.id, id: query.label } }) : 1,
     query.sprint ? db.sprint.count({ where: { id: query.sprint, project: accessibleProjectWhere(context) } }) : 1,
+    query.requestType ? db.serviceRequestType.count({ where: { id: query.requestType, project: accessibleProjectWhere(context) } }) : 1,
   ]);
   return checks.every(Boolean) && (!query.priority || ["URGENT", "HIGH", "MEDIUM", "LOW"].includes(query.priority.toUpperCase())) && (!query.sort || ["updated", "created", "priority", "due", "rank"].includes(query.sort));
 }

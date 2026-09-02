@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const project = await getProjectForContext(context, projectKey);
   if (!await requireProjectPermission(context, project.id, "issue.view")) return NextResponse.json({ issues: [] });
   const query = searchParams.get("q")?.trim();
+  const requestTypeId = searchParams.get("requestTypeId")?.trim();
   const issues = await db.issue.findMany({
     where: {
       workspaceId: project.workspaceId,
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
         { summary: { contains: query, mode: "insensitive" } },
         ...(/^WEB-(\d+)$/i.test(query) ? [{ number: Number(query.split("-")[1]) }] : []),
       ] } : {}),
+      ...(requestTypeId ? { serviceRequest: { requestTypeId } } : {}),
     },
     include: issueInclude,
     orderBy: [{ status: { position: "asc" } }, { rank: "asc" }],
