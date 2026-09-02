@@ -23,7 +23,7 @@ test("agents create accessible queue views and claim requests from a consistent 
   await page.goto("/projects/HELP/queues");
   await page.getByRole("button", { name: "New queue", exact: true }).click();
   await page.getByLabel("Queue name").fill("Unassigned triage");
-  await page.getByLabel("Visibility", { exact: true }).selectOption("TEAM");
+  await page.getByRole("combobox", { name: "Visibility", exact: true }).selectOption("TEAM");
   await page.getByLabel("Assignee filter").selectOption("unassigned");
   await page.getByLabel("Default view").check();
   await page.getByRole("button", { name: "Save queue" }).click();
