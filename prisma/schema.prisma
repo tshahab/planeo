@@ -742,6 +742,8 @@ model Project {
   portalOrganizations       PortalProjectOrganization[]
   portalCustomers           PortalProjectCustomer[]
   serviceQueues             ServiceQueue[]
+  slaCalendars              SlaCalendar[]
+  slaGoals                  SlaGoal[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, archivedAt])
@@ -1057,6 +1059,7 @@ model ServiceRequest {
   customerOrganizationId String?
   sharing                ServiceRequestSharing       @default(PRIVATE)
   slaState               String                      @default("NONE")
+  slaCheckedAt           DateTime?
   createdAt              DateTime                    @default(now())
   project                Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issue                  Issue                       @relation(fields: [issueId], references: [id], onDelete: Cascade)
@@ -1067,10 +1070,113 @@ model ServiceRequest {
   participants           ServiceRequestParticipant[]
   portalComments         PortalComment[]
   portalNotifications    PortalNotification[]
+  slaCycles              SlaCycle[]
+  slaSignals             SlaSignal[]
 
   @@index([workspaceId, projectId, requestTypeId, createdAt])
   @@index([customerReporterId, createdAt])
   @@index([customerOrganizationId, sharing, createdAt])
+}
+
+model SlaCalendar {
+  id             String @id @default(cuid())
+  projectId      String
+  name           String
+  currentVersion Int @default(1)
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions       SlaCalendarVersion[]
+  @@unique([projectId, name])
+}
+
+model SlaCalendarVersion {
+  id          String @id @default(cuid())
+  calendarId  String
+  version     Int
+  config      Json
+  createdAt   DateTime @default(now())
+  createdById String
+  calendar    SlaCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  goals       SlaGoalVersion[]
+  @@unique([calendarId, version])
+}
+
+model SlaGoal {
+  id             String @id @default(cuid())
+  projectId      String
+  name           String
+  metric         String
+  position       Int @default(0)
+  enabled        Boolean @default(true)
+  currentVersion Int @default(1)
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions       SlaGoalVersion[]
+  @@unique([projectId, name])
+  @@index([projectId, enabled, position])
+}
+
+model SlaGoalVersion {
+  id                String @id @default(cuid())
+  goalId            String
+  version           Int
+  calendarVersionId String
+  targetMinutes     Int
+  riskMinutes       Int
+  conditions        Json
+  rules             Json
+  publicLabel       String
+  portalVisible     Boolean @default(false)
+  createdAt         DateTime @default(now())
+  createdById       String
+  goal              SlaGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  calendarVersion   SlaCalendarVersion @relation(fields: [calendarVersionId], references: [id], onDelete: Restrict)
+  cycles            SlaCycle[]
+  @@unique([goalId, version])
+}
+
+model SlaSignal {
+  id          BigInt @id @default(autoincrement())
+  requestId   String
+  eventKey    String @unique
+  happenedAt  DateTime
+  payload     Json
+  goalIds     Json
+  processedAt DateTime?
+  request     ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  @@index([requestId, processedAt, id])
+}
+
+model SlaCycle {
+  id            String @id @default(cuid())
+  requestId     String
+  goalVersionId String
+  metric        String
+  sequence      Int
+  state         String @default("RUNNING")
+  elapsedMs     BigInt @default(0)
+  pauseReasons  Json
+  startedAt     DateTime
+  lastAt        DateTime
+  endedAt       DateTime?
+  riskAt        DateTime?
+  breachedAt    DateTime?
+  succeededAt   DateTime?
+  request       ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  goalVersion   SlaGoalVersion @relation(fields: [goalVersionId], references: [id], onDelete: Restrict)
+  events        SlaEvent[]
+  @@unique([requestId, metric, sequence])
+  @@index([requestId, state])
+}
+
+model SlaEvent {
+  id         String @id @default(cuid())
+  cycleId    String
+  eventKey   String @unique
+  type       String
+  happenedAt DateTime
+  elapsedMs  BigInt
+  metadata   Json
+  cycle      SlaCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  @@index([cycleId, happenedAt])
 }
 
 model ServiceQueue {

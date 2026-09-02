@@ -64,6 +64,18 @@ services:
     command: ["pnpm", "email:worker"]
     restart: unless-stopped
 
+  sla-worker:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["pnpm", "sla:worker"]
+    restart: unless-stopped
+
   webhook-worker:
     build:
       context: .

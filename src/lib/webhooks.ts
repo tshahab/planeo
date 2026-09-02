@@ -3,7 +3,7 @@ import { lookup } from "node:dns/promises";
 import type { Prisma } from "@prisma/client";
 import { enqueueChat } from "./chat-integrations";
 
-export const WEBHOOK_EVENTS=["issue.created","issue.updated","comment.created","sprint.created","release.created","release.released"] as const;
+export const WEBHOOK_EVENTS=["issue.created","issue.updated","comment.created","sprint.created","release.created","release.released","sla.risk","sla.breached","sla.succeeded"] as const;
 function key(){const value=process.env.WEBHOOK_ENCRYPTION_SECRET??process.env.SESSION_SECRET;if(!value||value.length<32)throw new Error("WEBHOOK_ENCRYPTION_SECRET or SESSION_SECRET must contain at least 32 characters");return createHash("sha256").update(value).digest()}
 export function encryptSecret(secret:string){const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",key(),iv),encrypted=Buffer.concat([cipher.update(secret,"utf8"),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),encrypted]).toString("base64url")}
 export function decryptSecret(value:string){const bytes=Buffer.from(value,"base64url"),iv=bytes.subarray(0,12),tag=bytes.subarray(12,28),ciphertext=bytes.subarray(28),decipher=createDecipheriv("aes-256-gcm",key(),iv);decipher.setAuthTag(tag);return Buffer.concat([decipher.update(ciphertext),decipher.final()]).toString("utf8")}
