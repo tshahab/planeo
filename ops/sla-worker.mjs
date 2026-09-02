@@ -5,7 +5,7 @@ import { accrue, matches } from "./sla-engine.mjs";
 
 async function event(tx, request, cycle, type, at, suffix = type) {
   const eventKey = `${cycle.id}:${suffix}`;
-  const inserted = await tx.slaEvent.createMany({ data: [{ cycleId: cycle.id, eventKey, type, happenedAt: at, elapsedMs: cycle.elapsedMs, metadata: { goalVersionId: cycle.goalVersionId } }], skipDuplicates: true });
+  const inserted = await tx.slaEvent.createMany({ data: [{ cycleId: cycle.id, eventKey, type, happenedAt: at, elapsedMs: cycle.elapsedMs, metadata: { goalVersionId: cycle.goalVersionId, state: cycle.state, pauseReasons: cycle.pauseReasons } }], skipDuplicates: true });
   if (!inserted.count) return;
   await tx.auditEvent.create({ data: { workspaceId: request.workspaceId, action: type, targetType: "slaCycle", targetId: cycle.id, metadata: { requestId: request.id, eventKey, happenedAt: at.toISOString() } } });
   if (!["sla.risk", "sla.breached", "sla.succeeded"].includes(type)) return;
@@ -34,7 +34,7 @@ export async function processSlaRequest(db, requestId, now = new Date()) {
     const request = await tx.serviceRequest.findUnique({ where: { id: requestId }, include: { issue: true, project: { select: { key: true } } } });
     if (!request || request.slaCheckedAt && request.slaCheckedAt > now) return false;
     const signals = await tx.slaSignal.findMany({ where: { requestId, processedAt: null, happenedAt: { lte: now } }, orderBy: { id: "asc" }, take: 100 });
-    const cycles = await tx.slaCycle.findMany({ where: { requestId }, orderBy: { sequence: "desc" }, include: { goalVersion: { include: { calendarVersion: true } } } });
+    const cycles = (await Promise.all(["RESPONSE", "RESOLUTION"].map(metric => tx.slaCycle.findFirst({ where: { requestId, metric }, orderBy: { sequence: "desc" }, include: { goalVersion: { include: { calendarVersion: true } } } })))).filter(Boolean);
     const latest = new Map(); for (const cycle of cycles) if (!latest.has(cycle.metric)) latest.set(cycle.metric, cycle);
     for (const signal of signals) {
       const payload = signal.payload;
@@ -80,7 +80,10 @@ export async function processSlaRequest(db, requestId, now = new Date()) {
 
 export async function processSlaBatch(db, now = new Date()) {
   const requests = await db.serviceRequest.findMany({ where: { project: { archivedAt: null }, issue: { archivedAt: null }, OR: [{ slaSignals: { some: { processedAt: null, happenedAt: { lte: now } } } }, { slaCycles: { some: { endedAt: null } }, OR: [{ slaCheckedAt: null }, { slaCheckedAt: { lt: new Date(now.getTime() - 30000) } }] }] }, orderBy: [{ slaCheckedAt: { sort: "asc", nulls: "first" } }, { id: "asc" }], take: 25, select: { id: true } });
-  let processed = 0; for (const request of requests) if (await processSlaRequest(db, request.id, now)) processed++; return processed;
+  let processed = 0, failed = 0;
+  for (const request of requests) { try { if (await processSlaRequest(db, request.id, now)) processed++; } catch (error) { failed++; console.error(JSON.stringify({ event: "sla.request.failed", requestId: request.id, code: error?.code ?? "processing_failed" })); } }
+  if (failed) throw new Error(`${failed} SLA requests failed; ${processed} processed successfully.`);
+  return processed;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

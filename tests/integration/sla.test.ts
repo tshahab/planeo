@@ -22,13 +22,22 @@ async function fixture() {
 }
 describe("durable SLA cycles", () => {
   it("recovers delayed breach times and idempotent history after restart", async () => {
-    const f = await fixture(); await f.signal(0, "issue.created");
+    const f = await fixture();
+    await db.workspaceMember.create({ data: { workspaceId: f.workspace.id, userId: f.user.id, role: "OWNER" } });
+    await db.issue.update({ where: { id: f.issue.id }, data: { assigneeId: f.user.id } });
+    await db.automationRule.create({ data: { workspaceId: f.workspace.id, projectId: f.project.id, name: "Escalate", createdById: f.user.id, trigger: { event: "sla.breached" }, conditions: [], actions: [{ type: "SET_PRIORITY", value: "URGENT" }], permissions: ["SET_PRIORITY"] } });
+    const subscription = await db.webhookSubscription.create({ data: { workspaceId: f.workspace.id, projectId: f.project.id, name: "Local capture", url: "http://local-simulator:9000/sla", events: ["sla.breached"], secretHash: "test-only", encryptedSecret: "test-only" } });
+    await f.signal(0, "issue.created");
     await processSlaRequest(db, f.request.id, new Date("2026-09-02T03:00:00Z"));
     await processSlaRequest(db, f.request.id, new Date("2026-09-02T03:00:00Z"));
     const cycle = await db.slaCycle.findFirstOrThrow({ where: { requestId: f.request.id }, include: { events: true } });
     expect(cycle.breachedAt?.toISOString()).toBe("2026-09-02T01:00:00.000Z");
     expect(cycle.riskAt?.toISOString()).toBe("2026-09-02T00:50:00.000Z");
     expect(cycle.events.filter(event => event.type === "sla.breached")).toHaveLength(1);
+    expect(cycle.events.find(event => event.type === "sla.breached")?.elapsedMs).toBe(3600000n);
+    expect(await db.automationJob.count({ where: { workspaceId: f.workspace.id, event: "sla.breached" } })).toBe(1);
+    expect(await db.webhookDelivery.count({ where: { subscriptionId: subscription.id } })).toBe(1);
+    expect(await db.notification.count({ where: { workspaceId: f.workspace.id, title: "Service goal overdue" } })).toBe(1);
     expect((await slaSummary(f.request.id, true))[0]).toMatchObject({ label: "Resolution target", state: "Overdue" });
     expect(JSON.stringify(await slaSummary(f.request.id, true))).not.toContain("Internal goal details");
   });

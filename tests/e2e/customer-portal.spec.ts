@@ -75,12 +75,14 @@ test("invited customers create private requests while agent data and unrelated c
     expect((await customer.request.get("/api/issues")).status()).toBe(401);
     expect((await customer.request.get("/api/audit")).status()).toBe(401);
     expect((await customer.request.get("/api/projects/HELP/queues")).status()).toBe(401);
+    expect((await customer.request.get(`/api/portal/${unique}/requests/${id}/sla`)).status()).toBe(200);
     const otherPage = await outsider.newPage();
     await otherPage.goto(`/portal/activate?token=${await invite(`${unique}@outsider.test`)}`);
     await otherPage.getByLabel("New password").fill("CustomerPassword123");
     await otherPage.getByRole("button", { name: "Activate account" }).click();
     await expect(otherPage).toHaveURL(new RegExp(`/portal/${unique}$`));
     expect((await outsider.request.get(`/api/portal/${unique}/requests/${id}`)).status()).toBe(404);
+    expect((await outsider.request.get(`/api/portal/${unique}/requests/${id}/sla`)).status()).toBe(404);
     expect((await outsider.request.get(fileUrl!)).status()).toBe(404);
     const search = await outsider.request.get(`/api/portal/${unique}/requests?q=Private`);
     expect((await search.json()).requests).toEqual([]);
