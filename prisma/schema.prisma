@@ -741,6 +741,7 @@ model Project {
   serviceRequestUploads     ServiceRequestUpload[]
   portalOrganizations       PortalProjectOrganization[]
   portalCustomers           PortalProjectCustomer[]
+  serviceQueues             ServiceQueue[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, archivedAt])
@@ -1055,6 +1056,7 @@ model ServiceRequest {
   customerReporterId     String?
   customerOrganizationId String?
   sharing                ServiceRequestSharing       @default(PRIVATE)
+  slaState               String                      @default("NONE")
   createdAt              DateTime                    @default(now())
   project                Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   issue                  Issue                       @relation(fields: [issueId], references: [id], onDelete: Cascade)
@@ -1069,6 +1071,37 @@ model ServiceRequest {
   @@index([workspaceId, projectId, requestTypeId, createdAt])
   @@index([customerReporterId, createdAt])
   @@index([customerOrganizationId, sharing, createdAt])
+}
+
+model ServiceQueue {
+  id          String   @id @default(cuid())
+  projectId   String
+  ownerId     String
+  name        String
+  visibility  String   @default("PRIVATE")
+  definition  Json
+  position    Int      @default(0)
+  isDefault   Boolean  @default(false)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  snapshots   ServiceQueueSnapshot[]
+
+  @@index([projectId, visibility, position])
+}
+
+model ServiceQueueSnapshot {
+  id           String   @id @default(cuid())
+  queueId      String
+  queueVersion Int
+  userId       String
+  rows         Json
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  queue        ServiceQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  @@index([queueId, userId, expiresAt])
 }
 
 model ServiceRequestUpload {
