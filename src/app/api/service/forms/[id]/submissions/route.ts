@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (uploads.length) {
         const claimed = await tx.serviceRequestUpload.updateMany({ where: { id: { in: uploads.map(({ id: uploadId }) => uploadId) }, usedAt: null }, data: { usedAt: new Date() } });
         if (claimed.count !== uploads.length) throw new Error("An attachment was already submitted.");
-        await tx.attachment.createMany({ data: uploads.map((upload) => ({ issueId: issue.id, fileName: upload.fileName, objectKey: upload.objectKey, contentType: upload.contentType, size: upload.size })) });
+        await tx.attachment.createMany({ data: uploads.map((upload) => ({ issueId: issue.id, portalVisible: true, fileName: upload.fileName, objectKey: upload.objectKey, contentType: upload.contentType, size: upload.size })) });
       }
       await tx.issueActivity.create({ data: { issueId: issue.id, actorId: context?.user.id, action: "service.request.created", changes: { requestTypeId: type.id, version: version.version, portalCustomerId: portal?.customer.id } } });
       await tx.issueHistory.create({ data: { workspaceId, projectId: type.projectId, issueId: issue.id, event: "CREATED", statusCategory: (await tx.status.findUniqueOrThrow({ where: { id: type.initialStatusId } })).category, estimate: null } });

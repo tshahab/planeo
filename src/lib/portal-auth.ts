@@ -6,7 +6,7 @@ import { db } from "./db";
 const COOKIE_NAME = "planeo_portal_session";
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
 type PortalClaims = { sessionId: string; customerId: string; workspaceId: string; expiresAt: number };
-export type PortalContext = { customer: { id: string; email: string; name: string; locale: string; emailNotifications: boolean; issueReporterUserId: string }; workspace: { id: string; slug: string; name: string } };
+export type PortalContext = { customer: { id: string; email: string; name: string; locale: string; emailNotifications: boolean; issueReporterUserId: string }; workspace: { id: string; slug: string; name: string }; organizationProjects?: { organizationId: string; projectId: string }[] };
 
 function secret() { const value = process.env.SESSION_SECRET; if (!value || value.length < 32) throw new Error("SESSION_SECRET must contain at least 32 characters"); return value; }
 function sign(value: string) { return createHmac("sha256", secret()).update(`portal:${value}`).digest("base64url"); }
@@ -33,7 +33,9 @@ async function readClaims(): Promise<PortalClaims | null> {
 export async function getPortalContext(): Promise<PortalContext | null> {
   const claims = await readClaims(); if (!claims) return null;
   const customer = await db.portalCustomer.findFirst({ where: { id: claims.customerId, workspaceId: claims.workspaceId, verifiedAt: { not: null }, deactivatedAt: null, sessions: { some: { id: claims.sessionId, revokedAt: null, expiresAt: { gt: new Date() } } } }, include: { workspace: true } });
-  return customer ? { customer: { id: customer.id, email: customer.email, name: customer.name, locale: customer.locale, emailNotifications: customer.emailNotifications, issueReporterUserId: customer.issueReporterUserId }, workspace: { id: customer.workspace.id, slug: customer.workspace.slug, name: customer.workspace.name } } : null;
+  if (!customer) return null;
+  const organizationProjects = await db.portalProjectOrganization.findMany({ where: { enabled: true, project: { workspaceId: customer.workspaceId }, organization: { workspaceId: customer.workspaceId, members: { some: { customerId: customer.id, active: true } } } }, select: { organizationId: true, projectId: true } });
+  return { customer: { id: customer.id, email: customer.email, name: customer.name, locale: customer.locale, emailNotifications: customer.emailNotifications, issueReporterUserId: customer.issueReporterUserId }, workspace: { id: customer.workspace.id, slug: customer.workspace.slug, name: customer.workspace.name }, organizationProjects };
 }
 
 export async function issuePortalToken(tx: Prisma.TransactionClient, customerId: string, purpose: PortalTokenPurpose, lifetimeMinutes: number) {
@@ -58,6 +60,6 @@ export function portalRequestWhere(context: PortalContext): Prisma.ServiceReques
   return { workspaceId: context.workspace.id, project: portalProjectWhere(context), issue: { securityLevelId: null, archivedAt: null }, OR: [
     { customerReporterId: context.customer.id },
     { sharing: { in: ["PARTICIPANTS", "ORGANIZATION"] }, participants: { some: { customerId: context.customer.id } } },
-    { sharing: "ORGANIZATION", customerOrganization: { members: { some: { customerId: context.customer.id, active: true } }, projects: { some: { enabled: true, project: portalProjectWhere(context) } } } },
+    ...(context.organizationProjects ?? []).map(({ organizationId, projectId }) => ({ sharing: "ORGANIZATION" as const, projectId, customerOrganizationId: organizationId, customerOrganization: { members: { some: { customerId: context.customer.id, active: true } }, projects: { some: { enabled: true, projectId } } } })),
   ] };
 }

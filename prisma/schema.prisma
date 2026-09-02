@@ -1517,6 +1517,7 @@ model Attachment {
   fileName    String
   objectKey   String   @unique
   contentType String
+  portalVisible Boolean @default(false)
   size        Int
   createdAt   DateTime @default(now())
   issue       Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)

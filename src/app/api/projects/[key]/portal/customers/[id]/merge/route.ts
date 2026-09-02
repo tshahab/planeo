@@ -6,7 +6,7 @@ import { requireProjectPermission } from "@/lib/permissions";
 export async function POST(request: Request, { params }: { params: Promise<{ key: string; id: string }> }) {
   const context = await getAuthContext(); if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { key, id: sourceId } = await params; const project = await db.project.findFirst({ where: { workspaceId: context.workspace.id, key: key.toUpperCase(), template: "SERVICE", archivedAt: null }, select: { id: true } });
-  if (!project || !await requireProjectPermission(context, project.id, "project.admin")) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  if (!["OWNER", "ADMIN"].includes(context.role) || !project || !await requireProjectPermission(context, project.id, "project.admin")) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   const body = await request.json().catch(() => null) as { targetCustomerId?: string } | null; const targetId = body?.targetCustomerId;
   if (!targetId || targetId === sourceId) return NextResponse.json({ error: "Choose a different target customer." }, { status: 400 });
   const customers = await db.portalCustomer.findMany({ where: { workspaceId: context.workspace.id, id: { in: [sourceId, targetId] }, deactivatedAt: null }, select: { id: true, issueReporterUserId: true, projects: true, organizations: true, participants: true } });
