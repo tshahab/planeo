@@ -51,6 +51,27 @@ describe("service queue snapshots and triage", () => {
     await db.projectMember.update({ where: { projectId_userId: { projectId: f.project.id, userId: f.user.id } }, data: { role: "VIEWER" } });
     await expect(queueProject(f.context, "HELP")).rejects.toMatchObject({ status: 404 });
   });
+  it("rechecks permission schemes before reading snapshots or applying actions", async () => {
+    const f = await fixture(), issue = await f.request(1);
+    const snapshot = await createQueueSnapshot(f.context, "HELP", f.queue.id);
+    const scheme = await db.permissionScheme.create({ data: { workspaceId: f.workspace.id, name: "Restricted", versions: { create: { version: 1, createdById: f.user.id, permissions: { "issue.view": ["WORKSPACE:OWNER"], "issue.edit": [] } } } }, include: { versions: true } });
+    await db.project.update({ where: { id: f.project.id }, data: { permissionSchemeVersionId: scheme.versions[0].id } });
+    await expect(applyQueueAction(f.context, "HELP", f.queue.id, snapshot.id, [issue.id], { claim: true })).rejects.toMatchObject({ status: 404 });
+    await db.permissionSchemeVersion.update({ where: { id: scheme.versions[0].id }, data: { permissions: {} } });
+    await expect(readQueueSnapshot(f.context, "HELP", f.queue.id, snapshot.id)).rejects.toMatchObject({ status: 404 });
+  });
+  it("combines filters without weakening scope and uses stable priority ordering", async () => {
+    const f = await fixture(), first = await f.request(1), second = await f.request(2);
+    await db.issue.update({ where: { id: first.id }, data: { priority: "LOW" } });
+    await db.issue.update({ where: { id: second.id }, data: { priority: "URGENT" } });
+    await db.serviceRequest.update({ where: { issueId: second.id }, data: { slaState: "AT_RISK" } });
+    await db.serviceQueue.update({ where: { id: f.queue.id }, data: { definition: parseQueueDefinition({ filters: { requestType: f.type.id, assignee: "unassigned", status: f.project.statuses[0].id }, sort: "priority" }) as never } });
+    const snapshot = await createQueueSnapshot(f.context, "HELP", f.queue.id), result = await readQueueSnapshot(f.context, "HELP", f.queue.id, snapshot.id);
+    expect(result.rows.map(row => row.id)).toEqual([second.id, first.id]);
+    expect(queueMetrics(result.rows, result.snapshot.createdAt.getTime())).toMatchObject({ total: 2, unassigned: 2, slaRisk: 1 });
+    const filtered = await queueFilter(f.context, f.project.id, parseQueueDefinition({ filters: { priority: "URGENT", slaState: "AT_RISK" } }));
+    expect((await db.issue.findMany({ where: filtered })).map(row => row.id)).toEqual([second.id]);
+  });
   it("allows exactly one concurrent claim and returns a conflict for the loser", async () => {
     const f = await fixture(), issue = await f.request(1);
     const a = await createQueueSnapshot(f.context, "HELP", f.queue.id), b = await createQueueSnapshot(f.context, "HELP", f.queue.id);
