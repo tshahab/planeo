@@ -60,6 +60,17 @@ services:
         condition: service_healthy
     command: ["sh", "-c", "pnpm db:deploy && pnpm webhook:worker"]
 
+  sla-worker-test:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
+    depends_on:
+      test-database:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm db:deploy && pnpm sla:worker"]
+
   automation-worker-test:
     build:
       context: .
@@ -144,6 +155,8 @@ services:
     depends_on:
       test-app:
         condition: service_healthy
+      sla-worker-test:
+        condition: service_started
     command: ["bash", "-lc", "corepack enable && pnpm install --frozen-lockfile && pnpm test:e2e"]
 
 volumes:

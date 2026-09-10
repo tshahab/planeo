@@ -1,0 +1,21 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test } from "@playwright/test";
+test("versioned SLA configuration starts durable timers and exposes safe report/issue views", async ({ page }) => {
+  const unique = `sla-${Date.now()}`;
+  await page.goto("/signup"); await page.getByLabel("Your name").fill("SLA owner"); await page.getByLabel("Email").fill(`${unique}@owner.test`); await page.getByLabel("Password").fill("SecurePlaneo123"); await page.getByLabel("Workspace name").fill("SLA service"); await page.getByLabel("Workspace URL").fill(unique); await page.getByRole("button", { name: "Create workspace" }).click(); await expect(page).toHaveURL(/\/$/);
+  const mutate = async (path: string, body: unknown, method = "POST") => page.evaluate(async ({ path, body, method }) => { const response = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); return { status: response.status, body: await response.json() }; }, { path, body, method });
+  expect((await mutate("/api/projects", { name: "Support", key: "HELP", template: "SERVICE", visibility: "PRIVATE" })).status).toBe(201);
+  await page.goto("/projects/HELP/settings/sla");
+  await page.getByLabel("Calendar configuration").fill(JSON.stringify({ timezone: "UTC", week: Array.from({ length: 7 }, () => [[0, 1440]]) }));
+  await page.getByRole("button", { name: "Publish version" }).click(); await expect(page.getByRole("status")).toContainText("Version 1 saved");
+  await page.getByRole("button", { name: "New goal" }).click();
+  await page.getByRole("button", { name: "Publish version" }).click(); await expect(page.getByRole("button", { name: /Resolution commitment · version 1/ })).toBeVisible();
+  const axe = await new AxeBuilder({ page }).analyze(); expect(axe.violations.filter(item => ["serious", "critical"].includes(item.impact ?? ""))).toEqual([]);
+  const type = await mutate("/api/projects/HELP/request-types", { name: "Help", schema: { fields: [{ key: "summary", kind: "summary", label: "Summary", required: true }] } });
+  expect((await mutate(`/api/projects/HELP/request-types/${type.body.requestType.id}/publish`, {})).status).toBe(201);
+  const submitted = await mutate(`/api/service/forms/${type.body.requestType.id}/submissions`, { values: { summary: "SLA request" } }); expect(submitted.status).toBe(201);
+  const issueId = submitted.body.request.issueId;
+  await expect.poll(async () => (await page.request.get(`/api/issues/${issueId}/sla`).then(response => response.json())).targets?.length, { timeout: 20000 }).toBe(1);
+  await page.goto(`/projects/HELP?issue=${issueId}`); await expect(page.getByRole("region", { name: "Service targets" })).toContainText("Resolution target");
+  await page.goto("/projects/HELP/reports/sla"); await expect(page.getByRole("heading", { name: "SLA report" })).toBeVisible(); await expect(page.getByRole("table")).toContainText("Resolution commitment");
+});
