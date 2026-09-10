@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { Client } from "pg";
+import { signedEnvelope } from "../../ops/mail-provider-simulator.mjs";
 
 test("customer portal sign-in is non-revealing, keyboard accessible, and mobile-ready", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -53,7 +54,36 @@ test("invited customers create private requests while agent data and unrelated c
     await customerPage.getByLabel("New password").fill("CustomerPassword123");
     await customerPage.getByRole("button", { name: "Activate account" }).click();
     await expect(customerPage).toHaveURL(new RegExp(`/portal/${unique}$`));
-    await customerPage.getByRole("link", { name: /Get support/ }).click();
+    await page.goto("/projects/HELP/settings/mailbox");
+    await page.getByLabel("Inbound address").fill(`${unique}@inbound.test`);
+    await page.getByRole("button", { name: "Save and rotate secret" }).click();
+    const secretField = page.getByLabel("Signing secret"); await expect(secretField).toBeVisible();
+    const secret = await secretField.inputValue();
+    const mailbox = (await inbox.query('SELECT id FROM "ServiceMailbox" WHERE address = $1', [`${unique}@inbound.test`])).rows[0];
+    const mailId = `${unique}@customer.test`;
+    const envelope = { providerId: unique, verifiedSender: `${unique}@customer.test`, recipient: `${unique}@inbound.test`, raw: Buffer.from(`From: ${unique}@customer.test\r\nTo: ${unique}@inbound.test\r\nMessage-ID: <${mailId}>\r\nSubject: Email request\r\n\r\nEmail description`).toString("base64") };
+    const adapter = await browser.newContext();
+    try {
+      const endpoint = `/api/service/mail/${mailbox.id}`;
+      expect((await adapter.request.post(endpoint, { data: envelope })).status()).toBe(401);
+      const accepted = await adapter.request.post(endpoint, signedEnvelope(secret, envelope));
+      expect(accepted.status()).toBe(202); expect((await accepted.json()).status).toBe("ACCEPTED");
+      const duplicate = await adapter.request.post(endpoint, signedEnvelope(secret, envelope));
+      expect((await duplicate.json()).duplicate).toBe(true);
+      const emailRequest = (await inbox.query('SELECT r.id, r."issueId" FROM "ServiceRequest" r JOIN "InboundMessage" m ON m."requestId" = r.id WHERE m."mailboxId" = $1', [mailbox.id])).rows[0];
+      expect((await post(`/api/issues/${emailRequest.issueId}/conversation`, { mode: "PUBLIC", body: "Public agent email reply", idempotencyKey: unique })).status).toBe(200);
+      await customerPage.goto(`/portal/${unique}/requests/${emailRequest.id}`);
+      await expect(customerPage.getByText("Public agent email reply")).toBeVisible();
+      const delivery = (await inbox.query('SELECT "dedupeKey", "mailHeaders" FROM "EmailDelivery" WHERE "issueId" = $1 AND category = $2 ORDER BY "createdAt" DESC LIMIT 1', [emailRequest.issueId, "PORTAL_CONVERSATION"])).rows[0];
+      const reply = { ...envelope, providerId: `${unique}-reply`, raw: Buffer.from(`From: ${unique}@customer.test\r\nTo: ${unique}@inbound.test\r\nMessage-ID: <reply-${mailId}>\r\nIn-Reply-To: ${delivery.mailHeaders["Message-ID"]}\r\nSubject: Changed subject\r\n\r\nReply from email`).toString("base64") };
+      expect((await adapter.request.post(endpoint, signedEnvelope(secret, reply))).status()).toBe(202);
+      await customerPage.reload(); await expect(customerPage.getByText("Reply from email")).toBeVisible();
+      expect((await adapter.request.post(`${endpoint}/bounce`, signedEnvelope(secret, { email: `${unique}@customer.test`, deliveryKey: delivery.dedupeKey, reason: "HARD_BOUNCE" }))).status()).toBe(200);
+      expect((await inbox.query('SELECT status FROM "EmailDelivery" WHERE "dedupeKey" = $1', [delivery.dedupeKey])).rows[0].status).toBe("DEAD");
+      expect((await customer.request.get(`/api/issues/${emailRequest.issueId}/conversation`)).status()).toBe(401);
+    } finally { await adapter.close(); }
+    await customerPage.goto(`/portal/${unique}`);
+    await customerPage.locator(`a[href="/service/forms/${created.body.requestType.id}"]`).click();
     await customerPage.getByLabel("Summary *").fill("Private customer request");
     await customerPage.getByLabel("Details *").fill("Customer-visible description");
     await customerPage.getByLabel("Files").setInputFiles({ name: "customer.txt", mimeType: "text/plain", buffer: Buffer.from("customer attachment") });
