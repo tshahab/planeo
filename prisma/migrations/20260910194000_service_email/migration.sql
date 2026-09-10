@@ -1,0 +1,14 @@
+ALTER TABLE "PortalComment" ALTER COLUMN "customerId" DROP NOT NULL;
+ALTER TABLE "PortalComment" ADD COLUMN "agentId" TEXT REFERENCES "User"("id") ON DELETE RESTRICT, ADD COLUMN "messageId" TEXT;
+ALTER TABLE "PortalComment" ADD CONSTRAINT "PortalComment_author_check" CHECK (("customerId" IS NOT NULL)::INTEGER + ("agentId" IS NOT NULL)::INTEGER = 1);
+CREATE UNIQUE INDEX "PortalComment_messageId_key" ON "PortalComment"("messageId");
+ALTER TABLE "EmailDelivery" ADD COLUMN "mailHeaders" JSONB, ADD COLUMN "portalCustomerId" TEXT;
+CREATE TABLE "ServiceMailbox" ("id" TEXT PRIMARY KEY, "projectId" TEXT NOT NULL REFERENCES "Project"("id") ON DELETE CASCADE, "address" TEXT NOT NULL, "requestTypeId" TEXT NOT NULL REFERENCES "ServiceRequestType"("id") ON DELETE RESTRICT, "encryptedSecret" TEXT NOT NULL, "enabled" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "ServiceMailbox_projectId_key" ON "ServiceMailbox"("projectId");
+CREATE UNIQUE INDEX "ServiceMailbox_address_key" ON "ServiceMailbox"("address");
+CREATE TABLE "InboundMessage" ("id" TEXT PRIMARY KEY, "mailboxId" TEXT NOT NULL REFERENCES "ServiceMailbox"("id") ON DELETE CASCADE, "providerId" TEXT NOT NULL, "messageId" TEXT NOT NULL, "sender" TEXT NOT NULL, "status" TEXT NOT NULL, "reason" TEXT, "requestId" TEXT, "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "InboundMessage_mailboxId_providerId_key" ON "InboundMessage"("mailboxId","providerId");
+CREATE UNIQUE INDEX "InboundMessage_mailboxId_messageId_key" ON "InboundMessage"("mailboxId","messageId");
+CREATE INDEX "InboundMessage_mailboxId_receivedAt_idx" ON "InboundMessage"("mailboxId","receivedAt");
+CREATE TABLE "MailSuppression" ("id" TEXT PRIMARY KEY, "workspaceId" TEXT NOT NULL REFERENCES "Workspace"("id") ON DELETE CASCADE, "email" TEXT NOT NULL, "reason" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "MailSuppression_workspaceId_email_key" ON "MailSuppression"("workspaceId","email");
