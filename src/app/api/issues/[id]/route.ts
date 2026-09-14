@@ -26,7 +26,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!existing) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   if (body?.version !== undefined && (!Number.isInteger(body.version) || Number(body.version) !== existing.version)) return NextResponse.json({ error: "Issue changed since it was loaded. Refresh and retry.", currentVersion: existing.version }, { status: 409 });
 
-  const data: { statusId?: string; summary?: string; description?: string; resolution?: string | null; priority?: "URGENT" | "HIGH" | "MEDIUM" | "LOW"; estimate?: number | null; assigneeId?: string | null; dueDate?: Date | null; completedAt?: Date | null } = {};
+  const data: { statusId?: string; summary?: string; description?: string; resolution?: string | null; priority?: "URGENT" | "HIGH" | "MEDIUM" | "LOW"; estimate?: number | null; assigneeId?: string | null; dueDate?: Date | null; completedAt?: Date | null; hierarchyLevelId?: string | null } = {};
   const changes: Record<string, unknown> = {};
   let labelNames: string[] | undefined;
 
@@ -80,6 +80,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       data.dueDate = dueDate;
     }
     changes.dueDate = { from: existing.dueDate?.toISOString() ?? null, to: data.dueDate?.toISOString() ?? null };
+  }
+  if (body?.hierarchyLevelId !== undefined) {
+    if (body.hierarchyLevelId !== null && typeof body.hierarchyLevelId !== "string") return NextResponse.json({ error: "Hierarchy level is invalid." }, { status: 400 });
+    const level = typeof body.hierarchyLevelId === "string" ? await db.hierarchyLevel.findFirst({ where: { id: body.hierarchyLevelId, workspaceId: context.workspace.id, archivedAt: null } }) : null;
+    const issueType = await db.issueType.findUnique({ where: { id: existing.issueTypeId }, select: { kind: true } });
+    if (body.hierarchyLevelId && (!level || issueType?.kind !== "EPIC")) return NextResponse.json({ error: "Planning levels can only be assigned to epic work in this workspace." }, { status: 400 });
+    data.hierarchyLevelId = level?.id ?? null; changes.hierarchyLevelId = { from: existing.hierarchyLevelId, to: data.hierarchyLevelId };
   }
   if (body?.labels !== undefined) {
     if (!Array.isArray(body.labels) || body.labels.some((label) => typeof label !== "string")) return NextResponse.json({ error: "Labels are invalid." }, { status: 400 });

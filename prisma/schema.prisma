@@ -214,6 +214,7 @@ model Workspace {
   auditEvents            AuditEvent[]
   invitations            WorkspaceInvitation[]
   savedFilters           SavedFilter[]
+  hierarchyLevels       HierarchyLevel[]
   emailDeliveries        EmailDelivery[]
   issueHistory           IssueHistory[]
   apiTokens              ApiToken[]
@@ -1029,6 +1030,7 @@ model Issue {
   reporterId            String
   assigneeId            String?
   parentId              String?
+  hierarchyLevelId      String?
   summary               String
   description           Json?
   resolution            String?
@@ -1049,6 +1051,7 @@ model Issue {
   assignee              User?                 @relation("Assignee", fields: [assigneeId], references: [id])
   parent                Issue?                @relation("Subtasks", fields: [parentId], references: [id])
   subtasks              Issue[]               @relation("Subtasks")
+  hierarchyLevel        HierarchyLevel?        @relation(fields: [hierarchyLevelId], references: [id], onDelete: Restrict)
   comments              Comment[]
   attachments           Attachment[]
   labels                IssueLabel[]
@@ -1073,6 +1076,25 @@ model Issue {
   @@index([workspaceId, assigneeId, statusId])
   @@index([projectId, statusId, rank])
   @@index([securityLevelId])
+  @@index([workspaceId, hierarchyLevelId])
+  @@index([parentId])
+}
+
+model HierarchyLevel {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String
+  position    Int
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  issues      Issue[]
+
+  @@unique([workspaceId, name])
+  @@unique([workspaceId, position])
+  @@index([workspaceId, archivedAt, position])
 }
 
 model PortalGroup {

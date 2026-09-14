@@ -11,6 +11,7 @@ type IssueRecord = PrismaIssue & {
   sprintIssues: { sprint: { id: string; name: string } }[];
   releases: { release: { id:string; name:string; status:"PLANNED"|"RELEASED"; archivedAt:Date|null; releasedAt:Date|null } }[];
   customFieldValues: { fieldId: string; value: unknown; field: { name: string; type: string; options: unknown; archivedAt: Date | null } }[];
+  hierarchyLevel: { id: string; name: string; color: string; position: number } | null;
 };
 
 const priorities: Record<string, Priority> = {
@@ -26,6 +27,7 @@ export function toUiIssue(issue: IssueRecord, projectKey: string): Issue {
     status: issue.status.name as UiStatus,
     priority: priorities[issue.priority],
     type: issue.issueType.name,
+    hierarchyLevel: issue.hierarchyLevel ?? undefined,
     assignee: issue.assignee ? {
       id: issue.assignee.id,
       name: issue.assignee.name,

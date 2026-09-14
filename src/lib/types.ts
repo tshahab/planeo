@@ -21,6 +21,7 @@ export interface Issue {
   status: Status;
   priority: Priority;
   type: IssueType;
+  hierarchyLevel?: { id: string; name: string; color: string; position: number };
   assignee?: Person;
   points?: number;
   labels: string[];
