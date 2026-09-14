@@ -1,0 +1,9 @@
+CREATE TABLE "KnowledgeSpace" ("id" TEXT PRIMARY KEY,"workspaceId" TEXT NOT NULL REFERENCES "Workspace"("id") ON DELETE CASCADE,"name" TEXT NOT NULL,"slug" TEXT NOT NULL,"language" TEXT NOT NULL DEFAULT 'en',"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "KnowledgeSpace_workspaceId_slug_key" ON "KnowledgeSpace"("workspaceId","slug");
+CREATE TABLE "KnowledgeArticle" ("id" TEXT PRIMARY KEY,"spaceId" TEXT NOT NULL REFERENCES "KnowledgeSpace"("id") ON DELETE CASCADE,"slug" TEXT NOT NULL,"title" TEXT NOT NULL,"publishedAt" TIMESTAMP(3),"archivedAt" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "KnowledgeArticle_spaceId_slug_key" ON "KnowledgeArticle"("spaceId","slug");
+CREATE INDEX "KnowledgeArticle_publishedAt_archivedAt_idx" ON "KnowledgeArticle"("publishedAt","archivedAt");
+CREATE TABLE "KnowledgeArticleVersion" ("id" TEXT PRIMARY KEY,"articleId" TEXT NOT NULL REFERENCES "KnowledgeArticle"("id") ON DELETE CASCADE,"version" INTEGER NOT NULL,"body" TEXT NOT NULL,"authorId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "KnowledgeArticleVersion_articleId_version_key" ON "KnowledgeArticleVersion"("articleId","version");
+CREATE TABLE "KnowledgeArticleFeedback" ("id" TEXT PRIMARY KEY,"articleId" TEXT NOT NULL REFERENCES "KnowledgeArticle"("id") ON DELETE CASCADE,"customerId" TEXT NOT NULL REFERENCES "PortalCustomer"("id") ON DELETE CASCADE,"helpful" BOOLEAN NOT NULL,"comment" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "KnowledgeArticleFeedback_articleId_customerId_key" ON "KnowledgeArticleFeedback"("articleId","customerId");
