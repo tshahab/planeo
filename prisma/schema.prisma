@@ -185,6 +185,8 @@ model User {
   watchedIssues           IssueWatcher[]
   savedFilters            SavedFilter[]
   ownedPlans              PortfolioPlan[]            @relation("PlanOwner")
+  planningTeamMemberships PlanningTeamMember[]
+  planningAvailability   TeamAvailability[]
   recentIssueViews        RecentIssueView[]
   sessions                Session[]
   passwordResetTokens     PasswordResetToken[]
@@ -217,6 +219,7 @@ model Workspace {
   savedFilters           SavedFilter[]
   hierarchyLevels       HierarchyLevel[]
   portfolioPlans        PortfolioPlan[]
+  planningTeams         PlanningTeam[]
   emailDeliveries        EmailDelivery[]
   issueHistory           IssueHistory[]
   apiTokens              ApiToken[]
@@ -1073,6 +1076,7 @@ model Issue {
   developmentActivities DevelopmentActivity[]
   securityLevel         IssueSecurityLevel?   @relation(fields: [securityLevelId], references: [id], onDelete: Restrict)
   serviceRequest        ServiceRequest?
+  planAllocations       PlanAllocation[]
 
   @@unique([projectId, number])
   @@index([workspaceId, updatedAt])
@@ -2128,6 +2132,7 @@ model PortfolioPlan {
   workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   owner         User         @relation("PlanOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   sources       PortfolioPlanSource[]
+  allocations   PlanAllocation[]
 
   @@unique([workspaceId, ownerId, name])
   @@index([workspaceId, shared, updatedAt])
@@ -2144,4 +2149,99 @@ model PortfolioPlanSource {
 
   @@index([planId])
   @@index([projectId])
+}
+
+model PlanningTeam {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  timezone    String   @default("UTC")
+  skills      String[] @default([])
+  version     Int      @default(1)
+  archivedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     PlanningTeamMember[]
+  capacities  TeamCapacityChange[]
+  availability TeamAvailability[]
+  holidays    TeamHoliday[]
+  allocations PlanAllocation[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, archivedAt])
+}
+
+model PlanningTeamMember {
+  id                   String   @id @default(cuid())
+  teamId               String
+  userId               String
+  startsAt             DateTime
+  endsAt               DateTime?
+  weeklyCapacityPoints Int?
+  skills               String[] @default([])
+  createdAt            DateTime @default(now())
+  team                  PlanningTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user                  User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([teamId, startsAt, endsAt])
+  @@index([userId, startsAt])
+}
+
+model TeamCapacityChange {
+  id                   String   @id @default(cuid())
+  teamId               String
+  effectiveFrom        DateTime
+  weeklyCapacityPoints Int
+  createdAt            DateTime @default(now())
+  team                  PlanningTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, effectiveFrom])
+  @@index([teamId, effectiveFrom])
+}
+
+model TeamAvailability {
+  id             String   @id @default(cuid())
+  teamId         String
+  userId         String
+  weekStart      DateTime
+  capacityPoints Int
+  reason         String?
+  createdAt      DateTime @default(now())
+  team            PlanningTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user            User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, userId, weekStart])
+  @@index([teamId, weekStart])
+}
+
+model TeamHoliday {
+  id                      String   @id @default(cuid())
+  teamId                  String
+  date                    DateTime
+  name                    String
+  capacityReductionPoints Int      @default(0)
+  team                    PlanningTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, date, name])
+  @@index([teamId, date])
+}
+
+model PlanAllocation {
+  id             String   @id @default(cuid())
+  planId         String
+  issueId        String
+  teamId         String
+  weekStart      DateTime
+  estimatePoints Int
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  plan           PortfolioPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  issue          Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  team           PlanningTeam @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, issueId, weekStart])
+  @@index([planId, weekStart])
+  @@index([teamId, weekStart])
 }
