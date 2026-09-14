@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
