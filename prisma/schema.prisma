@@ -744,6 +744,7 @@ model Project {
   serviceQueues             ServiceQueue[]
   slaCalendars              SlaCalendar[]
   slaGoals                  SlaGoal[]
+  inboundMailbox            ServiceMailbox?
 
   @@unique([workspaceId, key])
   @@index([workspaceId, archivedAt])
@@ -1361,11 +1362,13 @@ model ServiceRequestParticipant {
 model PortalComment {
   id         String         @id @default(cuid())
   requestId  String
-  customerId String
+  customerId String?
+  agentId    String?
+  messageId  String?        @unique
   body       String
   createdAt  DateTime       @default(now())
   request    ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  customer   PortalCustomer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customer   PortalCustomer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   @@index([requestId, createdAt])
 }
@@ -1599,6 +1602,8 @@ model EmailDelivery {
   htmlBody      String
   dedupeKey     String              @unique
   correlationId String
+  mailHeaders   Json?
+  portalCustomerId String?
   status        EmailDeliveryStatus @default(PENDING)
   attempts      Int                 @default(0)
   availableAt   DateTime            @default(now())
@@ -1613,6 +1618,43 @@ model EmailDelivery {
 
   @@index([status, availableAt])
   @@index([correlationId])
+}
+
+model ServiceMailbox {
+  id              String @id @default(cuid())
+  projectId       String @unique
+  address         String @unique
+  requestTypeId   String
+  encryptedSecret String
+  enabled         Boolean @default(true)
+  createdAt       DateTime @default(now())
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages        InboundMessage[]
+}
+
+model InboundMessage {
+  id             String @id @default(cuid())
+  mailboxId      String
+  providerId     String
+  messageId      String
+  sender         String
+  status         String
+  reason         String?
+  requestId      String?
+  receivedAt     DateTime @default(now())
+  mailbox        ServiceMailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  @@unique([mailboxId, providerId])
+  @@unique([mailboxId, messageId])
+  @@index([mailboxId, receivedAt])
+}
+
+model MailSuppression {
+  id          String @id @default(cuid())
+  workspaceId String
+  email       String
+  reason      String
+  createdAt   DateTime @default(now())
+  @@unique([workspaceId, email])
 }
 
 model Label {

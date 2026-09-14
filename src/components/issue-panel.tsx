@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { Issue, Person, ProjectStatus, Status } from "@/lib/types";
 import { Avatar } from "./workspace-app";
 import { SlaTargets } from "./sla-targets";
+import { CustomerConversation } from "./customer-conversation";
 
 export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUpdate, onArchive, readOnly = false }: { issue: Issue; statuses: ProjectStatus[]; currentUser: Person; onClose: () => void; onMove: (status: Status) => void; onUpdate: (changes: Record<string, unknown>) => Promise<void>; onArchive?: () => Promise<void>; readOnly?: boolean }) {
   const people = [currentUser];
@@ -118,6 +119,7 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
         <div className="panel-body">
           <main className="issue-main">
             <SlaTargets endpoint={`/api/issues/${issue.id}/sla`} agent={!readOnly} />
+            <CustomerConversation key={issue.id} issueId={issue.id} readOnly={readOnly} />
             <div className="issue-type-line"><span className={`type-pill ${issue.type.toLowerCase()}`}>{issue.type}</span><span>Created {issue.createdAt ? formatTime(issue.createdAt) : "recently"}</span></div>
             {readOnly ? <h2>{issue.title}</h2> : <input className="issue-title-input" aria-label="Issue title" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} />}
             <section className="description-section"><h3>Description</h3>{readOnly ? <p>{issue.description}</p> : <><textarea className="issue-description-input" aria-label="Issue description" value={description} maxLength={20000} onChange={(event) => setDescription(event.target.value)} /><button className="secondary-button issue-save-button" disabled={savingDetails || !title.trim() || (title === issue.title && description === issue.description)} onClick={saveDetails}>{savingDetails ? "Saving…" : "Save details"}</button></>}</section>
