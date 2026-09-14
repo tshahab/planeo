@@ -1,0 +1,2 @@
+CREATE TABLE "SatisfactionSurvey" ("id" TEXT PRIMARY KEY,"workspaceId" TEXT NOT NULL REFERENCES "Workspace"("id") ON DELETE CASCADE,"requestId" TEXT NOT NULL,"tokenHash" TEXT NOT NULL UNIQUE,"score" INTEGER,"comment" TEXT,"expiresAt" TIMESTAMP(3) NOT NULL,"submittedAt" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX "SatisfactionSurvey_workspaceId_expiresAt_idx" ON "SatisfactionSurvey"("workspaceId","expiresAt");

@@ -235,6 +235,7 @@ model Workspace {
   portalCustomers        PortalCustomer[]
   knowledgeSpaces         KnowledgeSpace[]
   serviceRecords          ServiceRecord[]
+  satisfactionSurveys     SatisfactionSurvey[]
   customerOrganizations  CustomerOrganization[]
   portalNotifications    PortalNotification[]
   organizationId         String?
@@ -261,6 +262,20 @@ model ServiceRecord {
   project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   @@index([workspaceId, kind, status])
   @@index([projectId, createdAt])
+}
+
+model SatisfactionSurvey {
+  id          String   @id @default(cuid())
+  workspaceId String
+  requestId   String
+  tokenHash   String   @unique
+  score       Int?
+  comment     String?
+  expiresAt   DateTime
+  submittedAt DateTime?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, expiresAt])
 }
 
 model KnowledgeSpace {
