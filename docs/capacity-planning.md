@@ -1,0 +1,7 @@
+# Portfolio capacity planning
+
+Portfolio capacity is separate from sprint capacity: existing project sprint targets and reports are unchanged. Planning-team administration is limited to workspace owners and administrators. Other authenticated plan viewers receive team-level totals only; member names, skills, availability reasons, and individual capacity are never included in plan capacity responses.
+
+Capacity uses whole issue estimate points per UTC Monday-to-Monday week with no fractional proration. A team's effective-dated default is capacity per active member. A membership can snapshot a different weekly value, and a weekly availability record overrides that member for that week. Team holiday reductions are then subtracted, never below zero. Allocation rows snapshot estimate points, so later issue-estimate edits do not rewrite historical demand. Membership rows are ended rather than replaced, and default changes have an effective date, keeping prior weeks reproducible.
+
+`GET/POST /api/planning-teams` lists or creates teams; administrators may export bounded team summaries with `?format=csv`. `POST /api/planning-teams/{id}` accepts versioned `add_member`, `end_member`, `capacity`, `availability`, and `holiday` actions. Imports use the same JSON validation boundary and are intentionally limited to one audited team/action per request. `GET /api/plans/{id}/capacity` returns 1–52 bounded aggregate weeks, while `POST` stores an authorized plan allocation. Team lists are capped at 100 and allocations at 5,000 per report.
