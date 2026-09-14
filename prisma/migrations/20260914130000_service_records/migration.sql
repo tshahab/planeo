@@ -1,0 +1,3 @@
+CREATE TABLE "ServiceRecord" ("id" TEXT PRIMARY KEY,"workspaceId" TEXT NOT NULL REFERENCES "Workspace"("id") ON DELETE CASCADE,"projectId" TEXT NOT NULL REFERENCES "Project"("id") ON DELETE CASCADE,"kind" TEXT NOT NULL,"title" TEXT NOT NULL,"severity" TEXT,"impact" TEXT,"urgency" TEXT,"status" TEXT NOT NULL DEFAULT 'OPEN',"details" JSONB NOT NULL,"createdById" TEXT NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX "ServiceRecord_workspaceId_kind_status_idx" ON "ServiceRecord"("workspaceId","kind","status");
+CREATE INDEX "ServiceRecord_projectId_createdAt_idx" ON "ServiceRecord"("projectId","createdAt");
