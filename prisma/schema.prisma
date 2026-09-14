@@ -1838,11 +1838,16 @@ model IssueLink {
   outwardIssueId String
   inwardIssueId  String
   type           String
+  lagDays        Int      @default(0)
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   outwardIssue   Issue  @relation("OutwardIssue", fields: [outwardIssueId], references: [id], onDelete: Cascade)
   inwardIssue    Issue  @relation("InwardIssue", fields: [inwardIssueId], references: [id], onDelete: Cascade)
 
   @@unique([outwardIssueId, inwardIssueId, type])
   @@index([inwardIssueId])
+  @@index([type, outwardIssueId])
 }
 
 model RateLimitBucket {

@@ -1,0 +1,7 @@
+# Dependency insights
+
+Planeo treats a `blocks` link as a directed edge from the blocker to the blocked issue. Links accept a lag from -365 through 365 calendar days and use optimistic `version` checks for changes and deletion. Creating a cycle returns `409 Conflict`; updates that were based on stale link data also return `409` with the current version.
+
+Plan dependency analysis is deterministic and bounded to 1,000 visible work items and 5,000 visible links. It uses UTC date-only comparisons. Estimates represent calendar-day duration, and missing estimates count as one day. A partial schedule stays in the graph and produces a missing-date warning rather than being discarded. The analyzer reports cycles, partial dates, impossible ordering, completed milestones with open blockers, cross-project conflicts, critical-path membership, and at-risk membership. Results are available as JSON and CSV from `GET /api/plans/{id}/dependencies`.
+
+Authorization is applied to both endpoints of every edge before the graph is constructed. If either work item is inaccessible, the edge is omitted and neither its identity nor an aggregate count is returned. Consequently a user's critical path describes only the work they are permitted to see. Issue link creation requires edit permission on the outward issue and view permission on the target. Mutations create audit records, and creation notifies an assigned target without exposing data to other users.
