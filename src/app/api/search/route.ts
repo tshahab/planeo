@@ -6,6 +6,7 @@ import { issueInclude } from "@/lib/issue-query";
 import { toUiIssue } from "@/lib/issue-mapper";
 import { accessibleProjectWhere } from "@/lib/project-query";
 import { issueSecurityWhere } from "@/lib/permissions";
+import { compileAdvancedQuery, QueryLanguageError, QUERY_FIELDS, QUERY_LANGUAGE_VERSION } from "@/lib/advanced-query";
 
 const PAGE_SIZE = 25;
 const priorities = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
@@ -15,6 +16,11 @@ export async function GET(request: Request) {
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const params = new URL(request.url).searchParams;
+  const advanced = params.get("query")?.trim() ?? "";
+  let advancedWhere: Prisma.IssueWhereInput | undefined;
+  let queryCost = 0;
+  if (advanced) try { const compiled = compileAdvancedQuery(advanced); advancedWhere = compiled.where; queryCost = compiled.cost; }
+  catch (cause) { const error = cause as QueryLanguageError; return NextResponse.json({ error: error.message, code: error.code ?? "INVALID_QUERY", offset: error.offset ?? 0, version: QUERY_LANGUAGE_VERSION }, { status: error.code === "QUERY_TOO_COMPLEX" ? 422 : 400 }); }
   const query = (params.get("q") ?? "").trim().slice(0, 200);
   const page = positiveInt(params.get("page"), 1);
   const sort = sorts.find((value) => value === params.get("sort")) ?? "updated";
@@ -31,7 +37,8 @@ export async function GET(request: Request) {
     workspaceId: context.workspace.id,
     archivedAt: null,
     parentId: null,
-    AND: [await issueSecurityWhere(context)],
+    // Authorization is part of the database predicate, before count, ordering, or pagination.
+    AND: [await issueSecurityWhere(context), ...(advancedWhere ? [advancedWhere] : [])],
     project: { is: accessibleProjectWhere(context) },
     ...(query ? { OR: [
       { summary: { contains: query, mode: "insensitive" } },
@@ -65,7 +72,7 @@ export async function GET(request: Request) {
   ]);
   const results = records.map((record) => ({ ...toUiIssue(record, record.project.key), projectName: record.project.name }));
   if (exactKey) results.sort((a, b) => Number(b.key.toUpperCase() === query.toUpperCase()) - Number(a.key.toUpperCase() === query.toUpperCase()));
-  return NextResponse.json({ results, total, page, pageSize: PAGE_SIZE, filters: { projects, members: members.map(({ user }) => user), labels, sprints, releases, requestTypes } });
+  return NextResponse.json({ results, total, page, pageSize: PAGE_SIZE, query: { version: QUERY_LANGUAGE_VERSION, cost: queryCost, fields: QUERY_FIELDS }, filters: { projects, members: members.map(({ user }) => user), labels, sprints, releases, requestTypes } });
 }
 
 function positiveInt(value: string | null, fallback: number) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000 ? parsed : fallback; }
