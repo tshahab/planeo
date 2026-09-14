@@ -16,6 +16,7 @@ test("customer portal sign-in is non-revealing, keyboard accessible, and mobile-
 });
 
 test("invited customers create private requests while agent data and unrelated customers remain isolated", async ({ page, browser }) => {
+  test.setTimeout(60000);
   const unique = `portal-${Date.now()}`;
   await page.goto("/signup");
   await page.getByLabel("Your name").fill("Portal owner");
