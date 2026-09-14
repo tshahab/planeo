@@ -184,6 +184,7 @@ model User {
   sentNotifications       Notification[]            @relation("NotificationActor")
   watchedIssues           IssueWatcher[]
   savedFilters            SavedFilter[]
+  ownedPlans              PortfolioPlan[]            @relation("PlanOwner")
   recentIssueViews        RecentIssueView[]
   sessions                Session[]
   passwordResetTokens     PasswordResetToken[]
@@ -215,6 +216,7 @@ model Workspace {
   invitations            WorkspaceInvitation[]
   savedFilters           SavedFilter[]
   hierarchyLevels       HierarchyLevel[]
+  portfolioPlans        PortfolioPlan[]
   emailDeliveries        EmailDelivery[]
   issueHistory           IssueHistory[]
   apiTokens              ApiToken[]
@@ -835,6 +837,7 @@ model Project {
   slaCalendars              SlaCalendar[]
   slaGoals                  SlaGoal[]
   inboundMailbox            ServiceMailbox?
+  portfolioPlanSources     PortfolioPlanSource[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, archivedAt])
@@ -2103,4 +2106,37 @@ model WebhookDelivery {
   @@unique([subscriptionId, eventId])
   @@index([status, availableAt])
   @@index([subscriptionId, createdAt])
+}
+
+model PortfolioPlan {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  ownerId       String
+  name          String
+  description   String?
+  shared        Boolean      @default(false)
+  version       Int          @default(1)
+  configuration Json
+  archivedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner         User         @relation("PlanOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  sources       PortfolioPlanSource[]
+
+  @@unique([workspaceId, ownerId, name])
+  @@index([workspaceId, shared, updatedAt])
+}
+
+model PortfolioPlanSource {
+  id        String        @id @default(cuid())
+  planId    String
+  kind      String
+  projectId String?
+  query     String?
+  plan      PortfolioPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  project   Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([projectId])
 }
