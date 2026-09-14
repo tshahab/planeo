@@ -234,12 +234,33 @@ model Workspace {
   portalBranding         PortalBranding?
   portalCustomers        PortalCustomer[]
   knowledgeSpaces         KnowledgeSpace[]
+  serviceRecords          ServiceRecord[]
   customerOrganizations  CustomerOrganization[]
   portalNotifications    PortalNotification[]
   organizationId         String?
   organization           Organization?                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
+}
+
+model ServiceRecord {
+  id          String   @id @default(cuid())
+  workspaceId String
+  projectId   String
+  kind        String
+  title       String
+  severity    String?
+  impact      String?
+  urgency     String?
+  status      String   @default("OPEN")
+  details     Json
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, kind, status])
+  @@index([projectId, createdAt])
 }
 
 model KnowledgeSpace {
@@ -783,6 +804,7 @@ model Project {
   customFieldConfigurations CustomFieldProject[]
   customFieldValues         CustomFieldValue[]
   automationRules           AutomationRule[]
+  serviceRecords            ServiceRecord[]
   lead                      User?                       @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   defaultAssignee           User?                       @relation("ProjectDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
   permissionSchemeVersion   PermissionSchemeVersion?    @relation(fields: [permissionSchemeVersionId], references: [id], onDelete: Restrict)
