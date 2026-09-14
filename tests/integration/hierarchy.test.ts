@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { hierarchySummary, reparentIssue } from "@/lib/hierarchy";
 import type { AuthContext } from "@/lib/auth";
 
-beforeEach(async () => db.workspace.deleteMany({ where: { slug: { startsWith: "hierarchy-" } } }));
+beforeEach(async () => db.workspace.deleteMany({ where: { slug: { startsWith: "hierarchy-integration-cleanup-" } } }));
 afterAll(() => db.$disconnect());
 
 async function fixture() {
