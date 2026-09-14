@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { assertionIdentifier, consumeAssertion, samlClient } from "@/lib/saml";
 import { encryptSecret } from "@/lib/webhooks";
@@ -9,6 +9,10 @@ beforeEach(async () => {
   process.env.SESSION_SECRET = "saml-integration-secret-with-at-least-thirty-two-characters";
   process.env.PUBLIC_APP_URL = "http://localhost:3000";
   await db.organization.deleteMany({ where: { slug: { startsWith: "saml-test-" } } });
+});
+afterEach(() => {
+  delete process.env.SESSION_SECRET;
+  delete process.env.PUBLIC_APP_URL;
 });
 afterAll(() => db.$disconnect());
 
