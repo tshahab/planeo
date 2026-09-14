@@ -64,6 +64,8 @@ export async function POST(request: Request) {
   ]);
 
   const allowedPriorities = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
+  const hierarchyLevel = typeof body.hierarchyLevelId === "string" ? await db.hierarchyLevel.findFirst({ where: { id: body.hierarchyLevelId, workspaceId: project.workspaceId, archivedAt: null } }) : null;
+  if (body.hierarchyLevelId !== undefined && (!hierarchyLevel || issueType.kind !== "EPIC")) return NextResponse.json({ error: "Planning levels can only be assigned to epic work in this workspace." }, { status: 400 });
   const requestedPriority = typeof body.priority === "string" ? body.priority.toUpperCase() : project.defaultPriority;
   const priority = allowedPriorities.find((value) => value === requestedPriority) ?? project.defaultPriority;
   const mentions = await db.user.findMany({ where: { email: { in: mentionedEmails(description), mode: "insensitive" }, memberships: { some: { workspaceId: project.workspaceId } }, OR: [{ projectRoles: { some: { projectId: project.id } } }, ...(project.visibility === "PUBLIC" ? [{}] : [])] }, select: { id: true } });
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
         projectId: project.id,
         number: updatedProject.issueSequence,
         issueTypeId: issueType.id,
+        hierarchyLevelId: hierarchyLevel?.id,
         statusId: status.id,
         reporterId: reporter.id,
         assigneeId: assignee?.id,

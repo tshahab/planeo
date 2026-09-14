@@ -1,0 +1,12 @@
+"use client";
+/* eslint-disable react-hooks/set-state-in-effect -- initial tenant-scoped levels are loaded after mount */
+import { useEffect, useState } from "react";
+type Level = { id: string; name: string; color: string; position: number };
+export function HierarchySettings() {
+  const [levels, setLevels] = useState<Level[]>([]), [name, setName] = useState(""), [color, setColor] = useState("#6558d7"), [message, setMessage] = useState("");
+  async function load() { const response = await fetch("/api/hierarchy-levels"); const body = await response.json(); if (response.ok) setLevels(body.levels); }
+  useEffect(() => { void load(); }, []);
+  async function create() { const response = await fetch("/api/hierarchy-levels", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, color }) }); const body = await response.json(); if (!response.ok) return setMessage(body.error ?? "Level could not be created."); setName(""); setMessage("Hierarchy level created."); await load(); }
+  async function archive(level: Level) { const response = await fetch(`/api/hierarchy-levels/${level.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ archived: true }) }); const body = await response.json(); if (!response.ok) return setMessage(body.error ?? "Level could not be archived."); setMessage("Hierarchy level archived. Existing work keeps its level."); await load(); }
+  return <div className="admin-page hierarchy-admin"><div className="admin-content"><section aria-labelledby="hierarchy-title"><h2 id="hierarchy-title">Planning hierarchy</h2><p>Configure stable planning levels above epics, ordered from highest to lowest.</p>{message&&<p role="status">{message}</p>}<div className="admin-list">{levels.map(level=><div key={level.id}><span><strong><i aria-hidden="true" style={{display:"inline-block",width:10,height:10,borderRadius:3,background:level.color,marginRight:8}}/>{level.name}</strong><small>Level {level.position + 1} · above Epic</small></span><button onClick={()=>void archive(level)}>Archive</button></div>)}</div><form onSubmit={event=>{event.preventDefault();void create();}}><label>Level name<input value={name} maxLength={50} required onChange={event=>setName(event.target.value)}/></label><label>Color<input aria-label="Level color" type="color" value={color} onChange={event=>setColor(event.target.value)}/></label><button>Add level</button></form></section></div></div>;
+}
