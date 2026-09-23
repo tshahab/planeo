@@ -1,0 +1,35 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test } from "@playwright/test";
+
+test("models, baselines, and publishes a selected scenario change", async ({ page }) => {
+  const unique = `scenario-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  await page.goto("/signup");
+  await page.getByLabel("Your name").fill("Scenario Planner");
+  await page.getByLabel("Email").fill(`${unique}@example.test`);
+  await page.getByLabel("Password").fill("SecurePlaneo123");
+  await page.getByLabel("Workspace name").fill("Scenario Workspace");
+  await page.getByLabel("Workspace URL").fill(unique);
+  await page.getByRole("button", { name: "Create workspace" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  const issueStatus = await page.evaluate(async () => (await fetch("/api/issues", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectKey: "FIRST", title: "Scenario delivery target" }) })).status);
+  expect(issueStatus).toBe(201);
+  await page.goto("/plans");
+  await page.getByLabel("Plan name").fill("Delivery options");
+  await page.getByRole("group", { name: "Projects" }).getByRole("checkbox").first().check();
+  await page.getByRole("button", { name: "Create private plan" }).click();
+  await expect(page.getByRole("heading", { name: "Planning scenarios" })).toBeVisible();
+  await page.getByLabel("Scenario name").fill("Accelerated delivery");
+  await page.getByRole("button", { name: "Create scenario" }).click();
+  await page.getByLabel("Work item").selectOption({ index: 1 });
+  await page.getByLabel("Proposed due date").fill("2026-10-15");
+  await page.getByRole("button", { name: "Save proposed change" }).click();
+  await expect(page.getByText(/Live: .* → Proposed: 2026-10-15/)).toBeVisible();
+  await page.getByLabel("Baseline name").fill("Approved baseline");
+  await page.getByRole("button", { name: "Capture baseline" }).click();
+  await expect(page.getByText(/Baselines:.*Approved baseline/)).toBeVisible();
+  await page.getByRole("button", { name: "Publish selected changes" }).click();
+  await expect(page.getByRole("status")).toContainText("1 change(s) published; 0 conflict(s)");
+  await expect(page.getByText(/Latest publish: COMPLETED/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Export scenario" })).toBeVisible();
+  expect((await new AxeBuilder({ page }).include(".scenario-workbench").analyze()).violations).toEqual([]);
+});
