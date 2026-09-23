@@ -187,6 +187,8 @@ model User {
   ownedPlans              PortfolioPlan[]            @relation("PlanOwner")
   planningTeamMemberships PlanningTeamMember[]
   planningAvailability   TeamAvailability[]
+  ownedGoals              Goal[]                    @relation("GoalOwner")
+  goalUpdates             GoalUpdate[]
   recentIssueViews        RecentIssueView[]
   sessions                Session[]
   passwordResetTokens     PasswordResetToken[]
@@ -220,6 +222,7 @@ model Workspace {
   hierarchyLevels       HierarchyLevel[]
   portfolioPlans        PortfolioPlan[]
   planningTeams         PlanningTeam[]
+  goals                 Goal[]
   emailDeliveries        EmailDelivery[]
   issueHistory           IssueHistory[]
   apiTokens              ApiToken[]
@@ -2244,4 +2247,62 @@ model PlanAllocation {
   @@unique([planId, issueId, weekStart])
   @@index([planId, weekStart])
   @@index([teamId, weekStart])
+}
+
+model Goal {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  ownerId        String
+  parentId       String?
+  name           String
+  description    String?
+  status         String   @default("ON_TRACK")
+  visibility     String   @default("WORKSPACE")
+  progressMethod String   @default("MANUAL")
+  currentValue   Int      @default(0)
+  targetValue    Int      @default(100)
+  periodStart    DateTime
+  periodEnd      DateTime
+  version        Int      @default(1)
+  archivedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner          User @relation("GoalOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  parent         Goal? @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children       Goal[] @relation("GoalHierarchy")
+  updates        GoalUpdate[]
+  links          GoalLink[]
+
+  @@index([workspaceId, visibility, archivedAt])
+  @@index([ownerId, periodEnd])
+  @@index([parentId])
+}
+
+model GoalUpdate {
+  id         String   @id @default(cuid())
+  goalId     String
+  authorId   String
+  version    Int
+  status     String
+  progress   Int
+  note       String?
+  createdAt  DateTime @default(now())
+  goal       Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  author     User @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@unique([goalId, version])
+  @@index([goalId, createdAt])
+}
+
+model GoalLink {
+  id         String   @id @default(cuid())
+  goalId     String
+  targetType String
+  targetId   String
+  createdAt  DateTime @default(now())
+  goal       Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, targetType, targetId])
+  @@index([targetType, targetId])
 }

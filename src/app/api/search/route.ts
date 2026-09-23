@@ -7,6 +7,7 @@ import { toUiIssue } from "@/lib/issue-mapper";
 import { accessibleProjectWhere } from "@/lib/project-query";
 import { issueSecurityWhere } from "@/lib/permissions";
 import { compileAdvancedQuery, QueryLanguageError, QUERY_FIELDS, QUERY_LANGUAGE_VERSION } from "@/lib/advanced-query";
+import { goalWhere } from "@/lib/goals";
 
 const PAGE_SIZE = 25;
 const priorities = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
   };
   const orderBy: Prisma.IssueOrderByWithRelationInput[] = sort === "created" ? [{ createdAt: "desc" }] : sort === "priority" ? [{ priority: "asc" }, { updatedAt: "desc" }] : sort === "due" ? [{ dueDate: { sort: "asc", nulls: "last" } }] : sort === "rank" ? [{ rank: "asc" }] : [{ updatedAt: "desc" }];
-  const [total, records, projects, members, labels, sprints, releases, requestTypes] = await Promise.all([
+  const [total, records, projects, members, labels, sprints, releases, requestTypes, goals] = await Promise.all([
     db.issue.count({ where }),
     db.issue.findMany({ where, include: { ...issueInclude, project: { select: { key: true, name: true } } }, orderBy, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
     db.project.findMany({ where: accessibleProjectWhere(context), orderBy: { name: "asc" }, select: { id: true, key: true, name: true, statuses: { orderBy: { position: "asc" }, select: { id: true, name: true } }, issueTypes: { orderBy: { position: "asc" }, select: { id: true, name: true } } } }),
@@ -69,10 +70,11 @@ export async function GET(request: Request) {
     db.sprint.findMany({ where: { project: accessibleProjectWhere(context), state: { in: ["PLANNED", "ACTIVE"] } }, orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, projectId: true } }),
     db.release.findMany({ where: { project: accessibleProjectWhere(context) }, orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, projectId: true, archivedAt: true } }),
     db.serviceRequestType.findMany({ where: { archivedAt: null, project: accessibleProjectWhere(context) }, orderBy: { name: "asc" }, select: { id: true, name: true, projectId: true } }),
+    db.goal.findMany({ where: { ...goalWhere(context), ...(query ? { AND: [{ OR: [{ name: { contains: query, mode: "insensitive" } }, { description: { contains: query, mode: "insensitive" } }] }] } : {}) }, select: { id: true, name: true, status: true, visibility: true, periodEnd: true }, orderBy: { updatedAt: "desc" }, take: 25 }),
   ]);
   const results = records.map((record) => ({ ...toUiIssue(record, record.project.key), projectName: record.project.name }));
   if (exactKey) results.sort((a, b) => Number(b.key.toUpperCase() === query.toUpperCase()) - Number(a.key.toUpperCase() === query.toUpperCase()));
-  return NextResponse.json({ results, total, page, pageSize: PAGE_SIZE, query: { version: QUERY_LANGUAGE_VERSION, cost: queryCost, fields: QUERY_FIELDS }, filters: { projects, members: members.map(({ user }) => user), labels, sprints, releases, requestTypes } });
+  return NextResponse.json({ results, goals: goals.map(goal => ({ ...goal, resourceUrl: `/goals?goal=${goal.id}` })), total, page, pageSize: PAGE_SIZE, query: { version: QUERY_LANGUAGE_VERSION, cost: queryCost, fields: QUERY_FIELDS }, filters: { projects, members: members.map(({ user }) => user), labels, sprints, releases, requestTypes } });
 }
 
 function positiveInt(value: string | null, fallback: number) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 && parsed <= 10_000 ? parsed : fallback; }

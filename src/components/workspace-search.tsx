@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import type { Issue } from "@/lib/types";
 
 type Filters = { projects: Array<{ id: string; key: string; name: string; statuses: Array<{ id: string; name: string }>; issueTypes: Array<{ id: string; name: string }> }>; members: Array<{ id: string; name: string }>; labels: Array<{ id: string; name: string }>; sprints: Array<{ id: string; name: string; projectId: string }>; releases: Array<{ id: string; name: string; projectId: string; archivedAt?: string }> };
-type Payload = { results: Array<Issue & { projectName: string }>; total: number; page: number; pageSize: number; filters: Filters; error?: string; offset?: number };
+type Payload = { results: Array<Issue & { projectName: string }>; goals: Array<{ id: string; name: string; status: string; visibility: string; resourceUrl: string }>; total: number; page: number; pageSize: number; filters: Filters; error?: string; offset?: number };
 type SavedFilter = { id: string; name: string; query: Record<string, string>; shared: boolean; ownerId: string; owner: { name: string } };
 
 export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceName: string; currentUserId: string }) {
@@ -85,6 +85,7 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
       {error && <div className="search-state search-state-error" role="alert">{error}</div>}
       {!loading && !error && data?.results.length === 0 && <div className="search-state">No issues match these filters.</div>}
       {!loading && !error && <div className="search-result-list">{data?.results.map((issue) => <div key={issue.id}><input aria-label={`Select ${issue.key}`} type="checkbox" checked={selected[issue.id] !== undefined} onChange={event => setSelected(current => { const next = { ...current }; if (event.target.checked) next[issue.id] = issue.version ?? 0; else delete next[issue.id]; return next; })}/><Link href={`/projects/${issue.key.split("-")[0]}?issue=${issue.id}&returnTo=${encodeURIComponent(`${pathname}?${queryString}`)}`}><strong>{issue.key}</strong><span>{issue.title}<small>{issue.projectName} · {issue.status} · {issue.priority}</small></span><em>{issue.assignee?.name ?? "Unassigned"}</em></Link></div>)}</div>}
+      {!loading && !error && data?.goals?.length ? <section className="search-goals"><h2>Goals</h2>{data.goals.map(goal => <Link key={goal.id} href={goal.resourceUrl}><strong>{goal.name}</strong><small>{goal.status.replaceAll("_", " ")} · {goal.visibility.toLowerCase()}</small></Link>)}</section> : null}
       {!loading && !error && data && data.total > data.pageSize && <nav className="search-pagination" aria-label="Search result pages"><button disabled={page <= 1} onClick={() => update("page", String(page - 1))}>Previous</button><span>Page {page} of {pages}</span><button disabled={page >= pages} onClick={() => update("page", String(page + 1))}>Next</button></nav>}
     </section>
   </main>;
