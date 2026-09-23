@@ -185,6 +185,9 @@ model User {
   watchedIssues           IssueWatcher[]
   savedFilters            SavedFilter[]
   ownedPlans              PortfolioPlan[]            @relation("PlanOwner")
+  ownedScenarios          PlanScenario[]             @relation("ScenarioOwner")
+  scenarioBaselines       ScenarioBaseline[]         @relation("BaselineAuthor")
+  scenarioPublishes       ScenarioPublish[]          @relation("ScenarioPublisher")
   planningTeamMemberships PlanningTeamMember[]
   planningAvailability   TeamAvailability[]
   ownedGoals              Goal[]                    @relation("GoalOwner")
@@ -2136,6 +2139,7 @@ model PortfolioPlan {
   owner         User         @relation("PlanOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   sources       PortfolioPlanSource[]
   allocations   PlanAllocation[]
+  scenarios     PlanScenario[]
 
   @@unique([workspaceId, ownerId, name])
   @@index([workspaceId, shared, updatedAt])
@@ -2247,6 +2251,74 @@ model PlanAllocation {
   @@unique([planId, issueId, weekStart])
   @@index([planId, weekStart])
   @@index([teamId, weekStart])
+}
+
+model PlanScenario {
+  id          String   @id @default(cuid())
+  planId      String
+  ownerId     String
+  name        String
+  description String?
+  shared      Boolean  @default(false)
+  version     Int      @default(1)
+  archivedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  plan        PortfolioPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  owner       User @relation("ScenarioOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  changes     ScenarioChange[]
+  baselines   ScenarioBaseline[]
+  publishes   ScenarioPublish[]
+
+  @@unique([planId, name])
+  @@index([planId, shared, archivedAt])
+  @@index([ownerId, updatedAt])
+}
+
+model ScenarioChange {
+  id           String   @id @default(cuid())
+  scenarioId   String
+  issueId      String
+  baseVersion  Int
+  baseSnapshot Json
+  patch        Json
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  scenario     PlanScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@unique([scenarioId, issueId])
+  @@index([issueId])
+}
+
+model ScenarioBaseline {
+  id         String   @id @default(cuid())
+  scenarioId String
+  authorId   String
+  name       String
+  snapshot   Json
+  createdAt  DateTime @default(now())
+  scenario   PlanScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  author     User @relation("BaselineAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@unique([scenarioId, name])
+  @@index([scenarioId, createdAt])
+}
+
+model ScenarioPublish {
+  id               String   @id @default(cuid())
+  scenarioId       String
+  actorId          String
+  status           String
+  requestedChanges Json
+  appliedChanges   Json
+  conflicts        Json
+  rollbackSnapshot Json
+  createdAt        DateTime @default(now())
+  scenario         PlanScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  actor            User @relation("ScenarioPublisher", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([scenarioId, createdAt])
 }
 
 model Goal {
