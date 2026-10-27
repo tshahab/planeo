@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
-import { PlanError, planItems } from "@/lib/portfolio-plan";
+import { db } from "@/lib/db";
+import { PlanError, planItems, visiblePlan } from "@/lib/portfolio-plan";
 import { calculatePortfolioHealth } from "@/lib/portfolio-health";
 
 const cell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -10,6 +11,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   try {
     const id = (await params).id;
+    const snapshotId = new URL(request.url).searchParams.get("snapshot");
+    if (new URL(request.url).searchParams.get("history") === "true") {
+      const plan = await visiblePlan(context, id);
+      const snapshots = await db.portfolioHealthSnapshot.findMany({ where: { planId: plan.id, workspaceId: context.workspace.id }, select: { id: true, authorId: true, capturedAt: true, report: true }, orderBy: { capturedAt: "desc" }, take: 100 });
+      return NextResponse.json({ plan: { id: plan.id, name: plan.name }, snapshots }, { headers: { "cache-control": "private, no-store" } });
+    }
+    if (snapshotId) {
+      await visiblePlan(context, id);
+      const snapshot = await db.portfolioHealthSnapshot.findFirst({ where: { id: snapshotId, planId: id, workspaceId: context.workspace.id }, select: { id: true, planId: true, authorId: true, capturedAt: true, report: true } });
+      if (!snapshot) throw new PlanError("Health snapshot not found.", 404);
+      return NextResponse.json({ plan: { id }, snapshot }, { headers: { "cache-control": "private, no-store" } });
+    }
     const first = await planItems(context, id, 1);
     const pages = [first];
     const totalPages = Math.min(50, Math.ceil(first.total / first.pageSize));
