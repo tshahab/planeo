@@ -46,6 +46,8 @@ jobs:
           POSTGRES_PASSWORD: ci-staging-database-secret
           SESSION_SECRET: ci-session-secret-with-at-least-thirty-two-characters
           ATTACHMENT_SIGNING_SECRET: ci-attachment-secret-with-at-least-thirty-two-characters
+          AUDIT_EXPORT_KEY: ci-audit-export-key-with-at-least-thirty-two-characters
+          APP_URL: http://app:3000
         run: docker compose -f compose.staging.yaml up --build --abort-on-container-exit --exit-code-from smoke smoke
 
       - name: Publish browser diagnostics
@@ -62,4 +64,4 @@ jobs:
         if: always()
         run: |
           docker compose -f compose.test.yaml down --volumes
-          POSTGRES_PASSWORD=cleanup SESSION_SECRET=cleanup-secret-with-at-least-thirty-two-characters ATTACHMENT_SIGNING_SECRET=cleanup-secret-with-at-least-thirty-two-characters docker compose -f compose.staging.yaml down --volumes
+          POSTGRES_PASSWORD=cleanup SESSION_SECRET=cleanup-secret-with-at-least-thirty-two-characters ATTACHMENT_SIGNING_SECRET=cleanup-secret-with-at-least-thirty-two-characters AUDIT_EXPORT_KEY=cleanup-audit-export-key-with-at-least-thirty-two-characters APP_URL=http://app:3000 docker compose -f compose.staging.yaml down --volumes
