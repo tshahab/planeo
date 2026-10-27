@@ -134,6 +134,18 @@ services:
     depends_on:
       app:
         condition: service_healthy
+      email-worker:
+        condition: service_started
+      sla-worker:
+        condition: service_started
+      automation-worker:
+        condition: service_started
+      bulk-worker:
+        condition: service_started
+      chat-worker:
+        condition: service_started
+      webhook-worker:
+        condition: service_started
     command: ["node", "-e", "Promise.all(['/api/health/live','/api/health/ready','/login'].map(path => fetch('http://app:3000'+path).then(response => { if (!response.ok) throw new Error(path+' '+response.status) }))).then(() => console.log('staging smoke checks passed'))"]
 
 volumes:
