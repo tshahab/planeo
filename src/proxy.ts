@@ -22,9 +22,8 @@ export async function proxy(request: NextRequest) {
 
   if (request.cookies.has("planeo_session") || request.cookies.has("planeo_portal_session")) {
     const origin = request.headers.get("origin");
-    const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-    const protocol = request.headers.get("x-forwarded-proto") || request.nextUrl.protocol.replace(":", "");
-    const expectedOrigin = host ? `${protocol}://${host}` : request.nextUrl.origin;
+    const configuredOrigin = process.env.APP_URL?.trim();
+    const expectedOrigin = configuredOrigin ? new URL(configuredOrigin).origin : request.nextUrl.origin;
     if (!origin || origin !== expectedOrigin) {
       logEvent("warn", "request.cross_site_rejected", { requestId: correlationId, path: request.nextUrl.pathname, method: request.method, origin });
       return NextResponse.json({ error: "Cross-site request rejected." }, { status: 403, headers: { "X-Request-Id": correlationId } });
