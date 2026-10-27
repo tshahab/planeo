@@ -165,7 +165,7 @@ spec:
         - name: email
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
           envFrom: [{secretRef: {name: planeo-runtime}}]
-          command: [pnpm, email:worker]
+          command: [node, ops/email-worker.mjs]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -180,7 +180,7 @@ spec:
         - name: webhook
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
           envFrom: [{secretRef: {name: planeo-runtime}}]
-          command: [pnpm, webhook:worker]
+          command: [node, ops/webhook-worker.mjs]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -195,7 +195,7 @@ spec:
         - name: automation
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
           envFrom: [{secretRef: {name: planeo-runtime}}]
-          command: [pnpm, automation:worker]
+          command: [node, ops/automation-worker.mjs]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -210,7 +210,7 @@ spec:
         - name: bulk
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
           envFrom: [{secretRef: {name: planeo-runtime}}]
-          command: [pnpm, bulk:worker]
+          command: [node, ops/bulk-worker.mjs]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -225,7 +225,7 @@ spec:
         - name: chat
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
           envFrom: [{secretRef: {name: planeo-runtime}}]
-          command: [pnpm, chat:worker]
+          command: [node, ops/chat-worker.mjs]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -240,7 +240,7 @@ spec:
         - name: sla
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
           envFrom: [{secretRef: {name: planeo-runtime}}]
-          command: [pnpm, sla:worker]
+          command: [node, ops/sla-worker.mjs]
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
