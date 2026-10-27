@@ -74,6 +74,7 @@ spec:
     metadata: {labels: {app: postgres}}
     spec:
       serviceAccountName: planeo-db
+      automountServiceAccountToken: false
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -103,6 +104,7 @@ spec:
     metadata: {labels: {app: planeo-migrate}}
     spec:
       restartPolicy: OnFailure
+      automountServiceAccountToken: false
       containers:
         - name: migrate
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -132,6 +134,7 @@ spec:
     metadata: {labels: {app: planeo}}
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      automountServiceAccountToken: false
       containers:
         - name: app
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -159,6 +162,7 @@ spec:
     metadata: {labels: {app: planeo-worker, worker: email}}
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      automountServiceAccountToken: false
       containers:
         - name: email
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -177,6 +181,7 @@ spec:
     metadata: {labels: {app: planeo-worker, worker: webhook}}
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      automountServiceAccountToken: false
       containers:
         - name: webhook
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -195,6 +200,7 @@ spec:
     metadata: {labels: {app: planeo-worker, worker: automation}}
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      automountServiceAccountToken: false
       containers:
         - name: automation
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -212,6 +218,7 @@ spec:
     metadata: {labels: {app: planeo-worker, worker: bulk}}
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      automountServiceAccountToken: false
       containers:
         - name: bulk
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -229,6 +236,7 @@ spec:
     metadata: {labels: {app: planeo-worker, worker: chat}}
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      automountServiceAccountToken: false
       containers:
         - name: chat
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -249,6 +257,7 @@ spec:
     metadata: {labels: {app: planeo-worker, worker: sla}}
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      automountServiceAccountToken: false
       containers:
         - name: sla
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -305,6 +314,13 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8]
+      ports:
+        - protocol: TCP
+          port: 443
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -326,3 +342,31 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: planeo-app-ingress
+  namespace: planeo
+spec:
+  podSelector:
+    matchLabels: {app: planeo}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: openshift-ingress}
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: planeo-workers-ingress
+  namespace: planeo
+spec:
+  podSelector:
+    matchLabels: {app: planeo-worker}
+  policyTypes: [Ingress]
