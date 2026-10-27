@@ -251,6 +251,9 @@ spec:
   host: plan-uat.teknosys.ai
   to: {kind: Service, name: planeo}
   port: {targetPort: http}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -288,3 +291,24 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: planeo-postgres-ingress
+  namespace: planeo
+spec:
+  podSelector:
+    matchLabels: {app: postgres}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: planeo}
+        - podSelector:
+            matchLabels: {app: planeo-worker}
+        - podSelector:
+            matchLabels: {app: planeo-migrate}
+      ports:
+        - protocol: TCP
+          port: 5432
