@@ -78,6 +78,10 @@ spec:
       containers:
         - name: postgres
           image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           ports: [{containerPort: 5432}]
           env:
             - name: POSTGRES_DB
@@ -108,6 +112,11 @@ spec:
       containers:
         - name: migrate
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           command: [node, node_modules/prisma/build/index.js, migrate, deploy]
           env:
             - name: DATABASE_URL
@@ -138,6 +147,11 @@ spec:
       containers:
         - name: app
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           imagePullPolicy: Always
           ports: [{containerPort: 3000}]
           envFrom: [{secretRef: {name: planeo-runtime}}]
@@ -166,6 +180,11 @@ spec:
       containers:
         - name: email
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
             - {name: EMAIL_PROVIDER_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: EMAIL_PROVIDER_URL, optional: true}}}
@@ -185,6 +204,11 @@ spec:
       containers:
         - name: webhook
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
             - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET}}}
@@ -204,6 +228,11 @@ spec:
       containers:
         - name: automation
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
           command: [node, ops/automation-worker.mjs]
@@ -222,6 +251,11 @@ spec:
       containers:
         - name: bulk
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
           command: [node, ops/bulk-worker.mjs]
@@ -240,6 +274,11 @@ spec:
       containers:
         - name: chat
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
             - {name: APP_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: APP_URL, optional: true}}}
@@ -261,6 +300,11 @@ spec:
       containers:
         - name: sla
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: {type: RuntimeDefault}
+            capabilities: {drop: [ALL]}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
           command: [node, ops/sla-worker.mjs]
@@ -288,18 +332,15 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [planeo, planeo-worker, postgres, planeo-migrate]
+        values: [planeo, planeo-worker, planeo-migrate]
   policyTypes: [Egress]
   egress:
     - to:
-        - podSelector: {}
+        - podSelector:
+            matchLabels: {app: postgres}
       ports:
         - protocol: TCP
           port: 5432
-        - protocol: TCP
-          port: 3000
-        - protocol: TCP
-          port: 443
     - to:
         - ipBlock:
             cidr: 177.30.0.10/32
@@ -317,7 +358,7 @@ spec:
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
-            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8]
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8, 100.64.0.0/10, 177.30.0.0/16, 198.18.0.0/15]
       ports:
         - protocol: TCP
           port: 443
@@ -358,7 +399,6 @@ spec:
             matchLabels: {kubernetes.io/metadata.name: openshift-ingress}
         - namespaceSelector:
             matchLabels: {network.openshift.io/policy-group: ingress}
-        - podSelector: {}
       ports:
         - protocol: TCP
           port: 3000
