@@ -277,7 +277,7 @@ spec:
             capabilities: {drop: [ALL]}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
-            - {name: APP_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: APP_URL, optional: true}}}
+            - {name: APP_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: APP_URL}}}
             - {name: CHAT_PROVIDER_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: CHAT_PROVIDER_URL, optional: true}}}
             - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET}}}
           command: [node, ops/chat-worker.mjs]

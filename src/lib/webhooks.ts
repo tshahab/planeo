@@ -3,6 +3,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { Prisma } from "@prisma/client";
 import { enqueueChat } from "./chat-integrations";
+if (!process.env.WEBHOOK_ENCRYPTION_SECRET) throw new Error("WEBHOOK_ENCRYPTION_SECRET is required");
 
 export const WEBHOOK_EVENTS=["issue.created","issue.updated","comment.created","sprint.created","release.created","release.released","sla.risk","sla.breached","sla.succeeded"] as const;
 function key(){const value=process.env.WEBHOOK_ENCRYPTION_SECRET??process.env.SESSION_SECRET;if(!value||value.length<32)throw new Error("WEBHOOK_ENCRYPTION_SECRET or SESSION_SECRET must contain at least 32 characters");return createHash("sha256").update(value).digest()}
