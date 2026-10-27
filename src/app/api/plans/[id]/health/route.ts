@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PlanError, planItems, visiblePlan } from "@/lib/portfolio-plan";
-import { calculatePortfolioHealth } from "@/lib/portfolio-health";
+import { calculatePortfolioHealth, shouldSuppressSharedHealth } from "@/lib/portfolio-health";
 
 const cell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 
@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const totalPages = Math.min(50, Math.ceil(first.total / first.pageSize));
     for (let page = 2; page <= totalPages; page += 1) pages.push(await planItems(context, id, page));
     const items = pages.flatMap((page) => page.items).map((item) => ({ id: item.id, dueDate: item.dueDate, completedAt: item.completedAt?.toISOString() ?? null, estimate: item.estimate }));
-    const suppressed = first.plan.shared && first.total > 0 && first.total < 5;
+    const suppressed = shouldSuppressSharedHealth(first.plan.shared, first.total);
     const calculated = { ...calculatePortfolioHealth(items), scope: { total: first.total, bounded: first.total > items.length } };
     const result = { plan: { id: first.plan.id, name: first.plan.name }, health: suppressed ? { ...calculated, privacy: { suppressed: true, reason: "Shared plan aggregates require at least five visible issues." }, progress: { completed: 0, completionRate: 0, remaining: 0 }, schedule: { overdue: 0, unscheduled: 0, confidence: "LOW" as const }, forecast: { remainingPoints: 0, lowDays: 0, highDays: 0, confidence: "LOW" as const } } : { ...calculated, privacy: { suppressed: false } } };
     if (new URL(request.url).searchParams.get("format") === "csv") {

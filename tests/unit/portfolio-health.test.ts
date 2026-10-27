@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePortfolioHealth } from "@/lib/portfolio-health";
+import { calculatePortfolioHealth, shouldSuppressSharedHealth } from "@/lib/portfolio-health";
 
 describe("portfolio health", () => {
   it("calculates deterministic progress, schedule risk, and forecast ranges", () => {
@@ -20,5 +20,12 @@ describe("portfolio health", () => {
     expect(result.progress).toEqual({ completed: 0, completionRate: 0, remaining: 0 });
     expect(result.forecast).toMatchObject({ remainingPoints: 0, lowDays: 0, highDays: 0 });
     expect(result.schedule.confidence).toBe("LOW");
+  });
+
+  it("suppresses only small shared cohorts", () => {
+    expect(shouldSuppressSharedHealth(true, 1)).toBe(true);
+    expect(shouldSuppressSharedHealth(true, 4)).toBe(true);
+    expect(shouldSuppressSharedHealth(true, 5)).toBe(false);
+    expect(shouldSuppressSharedHealth(false, 1)).toBe(false);
   });
 });

@@ -18,6 +18,10 @@ export type PortfolioHealth = {
   forecast: { remainingPoints: number; lowDays: number; highDays: number; confidence: "HIGH" | "MEDIUM" | "LOW" };
 };
 
+export function shouldSuppressSharedHealth(shared: boolean, visibleIssueCount: number) {
+  return shared && visibleIssueCount > 0 && visibleIssueCount < 5;
+}
+
 export function calculatePortfolioHealth(items: HealthItem[], now = new Date("2026-01-01T00:00:00.000Z")): PortfolioHealth {
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const completed = items.filter((item) => item.completedAt !== null).length;
