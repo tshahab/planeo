@@ -15,6 +15,11 @@ function run(script: string, env: Partial<NodeJS.ProcessEnv>, args: string[] = [
 }
 
 describe("production readiness controls", () => {
+  it("runs the production preflight before starting the server", () => {
+    const dockerfile = readFileSync(join(root, "Dockerfile"), "utf8");
+    expect(dockerfile).toContain("node ops/validate-production-env.mjs && exec node server.js");
+  });
+
   it("rejects non-production or incomplete environments", () => {
     expect(run("ops/validate-production-env.mjs", { NODE_ENV: "test" })).toThrow(/NODE_ENV must be production/);
     expect(run("ops/validate-production-env.mjs", { NODE_ENV: "production" })).toThrow(/missing or short/);
@@ -30,6 +35,23 @@ describe("production readiness controls", () => {
       APP_URL: "https://plan-uat.teknosys.ai",
     })();
     expect(output).toContain("Production environment validated");
+  });
+
+  it.each([
+    "http://plan-uat.teknosys.ai",
+    "https://plan-uat.teknosys.ai/login",
+    "https://plan-uat.teknosys.ai?redirect=/login",
+    "https://user:password@plan-uat.teknosys.ai",
+    "not a url",
+  ])("rejects non-canonical APP_URL %s", (APP_URL) => {
+    expect(run("ops/validate-production-env.mjs", {
+      NODE_ENV: "production",
+      DATABASE_URL: "postgresql://prod.example/planeo",
+      SESSION_SECRET: "s".repeat(32),
+      ATTACHMENT_SIGNING_SECRET: "a".repeat(32),
+      AUDIT_EXPORT_KEY: "k".repeat(32),
+      APP_URL,
+    })).toThrow(/canonical HTTPS origin required/);
   });
 
   it("renders only explicit immutable release tags", () => {

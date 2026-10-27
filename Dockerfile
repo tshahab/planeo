@@ -44,4 +44,4 @@ COPY --from=builder /app/ops ./ops
 USER planeo
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD node -e "fetch('http://localhost:3000/api/health/ready').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node ops/validate-production-env.mjs && exec node server.js"]

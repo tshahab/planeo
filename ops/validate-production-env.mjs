@@ -9,7 +9,18 @@ const missing = required.filter((name) => !process.env[name] || process.env[name
 const developmentValues = required.filter((name) => forbidden.has(process.env[name]));
 const database = process.env.DATABASE_URL ?? "";
 if (database && !/^postgres(?:ql)?:\/\//.test(database)) missing.push("DATABASE_URL (PostgreSQL URL required)");
-if (!/^https:\/\//.test(process.env.APP_URL ?? "")) missing.push("APP_URL (HTTPS origin required)");
+const appUrl = process.env.APP_URL?.trim() ?? "";
+let validAppUrl = false;
+try {
+  const url = new URL(appUrl);
+  validAppUrl = url.protocol === "https:" &&
+    !url.username && !url.password &&
+    url.pathname === "/" && !url.search && !url.hash &&
+    url.origin === `https://${url.host}`;
+} catch {
+  validAppUrl = false;
+}
+if (!validAppUrl) missing.push("APP_URL (canonical HTTPS origin required)");
 if (process.env.NODE_ENV !== "production") throw new Error("NODE_ENV must be production");
 if (missing.length || developmentValues.length) {
   const details = [missing.length ? `missing or short: ${missing.join(", ")}` : "", developmentValues.length ? `development values: ${developmentValues.join(", ")}` : ""].filter(Boolean).join("; ");
