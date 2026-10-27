@@ -74,10 +74,6 @@ spec:
     metadata: {labels: {app: postgres}}
     spec:
       serviceAccountName: planeo-db
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
-        fsGroup: 0
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -135,6 +131,7 @@ spec:
   template:
     metadata: {labels: {app: planeo}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: app
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -161,10 +158,13 @@ spec:
   template:
     metadata: {labels: {app: planeo-worker, worker: email}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: email
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
-          envFrom: [{secretRef: {name: planeo-runtime}}]
+          env:
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
+            - {name: EMAIL_PROVIDER_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: EMAIL_PROVIDER_URL, optional: true}}}
           command: [node, ops/email-worker.mjs]
 ---
 apiVersion: apps/v1
@@ -176,10 +176,14 @@ spec:
   template:
     metadata: {labels: {app: planeo-worker, worker: webhook}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: webhook
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
-          envFrom: [{secretRef: {name: planeo-runtime}}]
+          env:
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
+            - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SESSION_SECRET, optional: true}}}
+            - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET, optional: true}}}
           command: [node, ops/webhook-worker.mjs]
 ---
 apiVersion: apps/v1
@@ -191,10 +195,12 @@ spec:
   template:
     metadata: {labels: {app: planeo-worker, worker: automation}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: automation
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
-          envFrom: [{secretRef: {name: planeo-runtime}}]
+          env:
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
           command: [node, ops/automation-worker.mjs]
 ---
 apiVersion: apps/v1
@@ -206,10 +212,12 @@ spec:
   template:
     metadata: {labels: {app: planeo-worker, worker: bulk}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: bulk
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
-          envFrom: [{secretRef: {name: planeo-runtime}}]
+          env:
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
           command: [node, ops/bulk-worker.mjs]
 ---
 apiVersion: apps/v1
@@ -221,10 +229,16 @@ spec:
   template:
     metadata: {labels: {app: planeo-worker, worker: chat}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: chat
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
-          envFrom: [{secretRef: {name: planeo-runtime}}]
+          env:
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
+            - {name: APP_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: APP_URL, optional: true}}}
+            - {name: CHAT_PROVIDER_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: CHAT_PROVIDER_URL, optional: true}}}
+            - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SESSION_SECRET, optional: true}}}
+            - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET, optional: true}}}
           command: [node, ops/chat-worker.mjs]
 ---
 apiVersion: apps/v1
@@ -236,10 +250,12 @@ spec:
   template:
     metadata: {labels: {app: planeo-worker, worker: sla}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: sla
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
-          envFrom: [{secretRef: {name: planeo-runtime}}]
+          env:
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
           command: [node, ops/sla-worker.mjs]
 ---
 apiVersion: route.openshift.io/v1
