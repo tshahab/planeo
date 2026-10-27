@@ -32,6 +32,16 @@ jobs:
           docker run --rm -e RELEASE_TAG="$RELEASE_TAG" -v "$PWD:/app" -w /app node:22-alpine \
             sh -c 'corepack enable && pnpm install --frozen-lockfile --ignore-scripts && pnpm release:render /tmp/planeo-release.yaml && ! grep -E "release-placeholder|planeo:latest" /tmp/planeo-release.yaml'
 
+      - name: Validate production configuration contract
+        run: |
+          docker run --rm \
+            -e NODE_ENV=production \
+            -e DATABASE_URL=postgresql://ci.example.internal/planeo-production \
+            -e SESSION_SECRET=ci-session-secret-with-at-least-thirty-two-characters \
+            -e ATTACHMENT_SIGNING_SECRET=ci-attachment-secret-with-at-least-thirty-two-characters \
+            -e AUDIT_EXPORT_KEY=ci-audit-export-key-with-at-least-thirty-two-characters \
+            planeo-ci:${{ github.sha }} pnpm production:validate
+
       - name: Run unit and integration tests
         run: docker compose -f compose.test.yaml run --rm tests
 
