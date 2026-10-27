@@ -11,12 +11,14 @@ export function PortfolioHealthDirectory() {
   const [saving, setSaving] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/plans").then((response) => response.json()).then(async (body) => {
+    const load = () => fetch("/api/plans").then((response) => response.json()).then(async (body) => {
       const plans = (body.plans ?? []) as Plan[];
       const values = await Promise.all(plans.map(async (plan) => { const [live, history] = await Promise.all([fetch(`/api/plans/${plan.id}/health`).then((response) => response.json()), fetch(`/api/plans/${plan.id}/health?history=true`).then((response) => response.json())]); return { plan, health: live.health, snapshots: history.snapshots ?? [] }; }));
       if (!cancelled) setReports(values.filter((value) => value.health));
     }).catch(() => undefined);
-    return () => { cancelled = true; };
+    void load();
+    window.addEventListener("planeo:plans-changed", load);
+    return () => { cancelled = true; window.removeEventListener("planeo:plans-changed", load); };
   }, []);
   async function capture(planId: string) { setSaving(planId); try { await fetch(`/api/plans/${planId}/health`, { method: "POST" }); const history = await fetch(`/api/plans/${planId}/health?history=true`).then((response) => response.json()); setReports((current) => current.map((entry) => entry.plan.id === planId ? { ...entry, snapshots: history.snapshots ?? [] } : entry)); } finally { setSaving(null); } }
   if (!reports.length) return null;
