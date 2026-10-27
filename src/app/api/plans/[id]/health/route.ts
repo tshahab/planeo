@@ -46,7 +46,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const id = (await params).id;
-  const response = await GET(new Request(new URL(request.url).toString()), { params: Promise.resolve({ id }) });
+  const liveUrl = new URL(request.url);
+  liveUrl.search = "";
+  const response = await GET(new Request(liveUrl), { params: Promise.resolve({ id }) });
   if (!response.ok) return response;
   const result = await response.json();
   const snapshot = await (await import("@/lib/db")).db.portfolioHealthSnapshot.create({ data: { workspaceId: context.workspace.id, planId: id, authorId: context.user.id, report: result.health } });
