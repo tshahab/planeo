@@ -23,6 +23,7 @@ export async function proxy(request: NextRequest) {
   if (request.cookies.has("planeo_session") || request.cookies.has("planeo_portal_session")) {
     const origin = request.headers.get("origin");
     const configuredOrigin = process.env.APP_URL?.trim();
+    if (process.env.NODE_ENV === "production" && !configuredOrigin) return NextResponse.json({ error: "Application origin is not configured." }, { status: 500, headers: { "X-Request-Id": correlationId } });
     const expectedOrigin = configuredOrigin ? new URL(configuredOrigin).origin : request.nextUrl.origin;
     if (!origin || origin !== expectedOrigin) {
       logEvent("warn", "request.cross_site_rejected", { requestId: correlationId, path: request.nextUrl.pathname, method: request.method, origin });
