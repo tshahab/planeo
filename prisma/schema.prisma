@@ -185,6 +185,7 @@ model User {
   watchedIssues           IssueWatcher[]
   savedFilters            SavedFilter[]
   ownedPlans              PortfolioPlan[]            @relation("PlanOwner")
+  portfolioHealthSnapshots PortfolioHealthSnapshot[] @relation("HealthSnapshotAuthor")
   ownedScenarios          PlanScenario[]             @relation("ScenarioOwner")
   scenarioBaselines       ScenarioBaseline[]         @relation("BaselineAuthor")
   scenarioPublishes       ScenarioPublish[]          @relation("ScenarioPublisher")
@@ -224,6 +225,7 @@ model Workspace {
   savedFilters           SavedFilter[]
   hierarchyLevels       HierarchyLevel[]
   portfolioPlans        PortfolioPlan[]
+  portfolioHealthSnapshots PortfolioHealthSnapshot[]
   planningTeams         PlanningTeam[]
   goals                 Goal[]
   emailDeliveries        EmailDelivery[]
@@ -2140,6 +2142,7 @@ model PortfolioPlan {
   sources       PortfolioPlanSource[]
   allocations   PlanAllocation[]
   scenarios     PlanScenario[]
+  healthSnapshots PortfolioHealthSnapshot[]
 
   @@unique([workspaceId, ownerId, name])
   @@index([workspaceId, shared, updatedAt])
@@ -2156,6 +2159,21 @@ model PortfolioPlanSource {
 
   @@index([planId])
   @@index([projectId])
+}
+
+model PortfolioHealthSnapshot {
+  id          String       @id @default(cuid())
+  workspaceId String
+  planId      String
+  authorId    String
+  capturedAt  DateTime     @default(now())
+  report      Json
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan        PortfolioPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  author      User          @relation("HealthSnapshotAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([planId, capturedAt])
+  @@index([workspaceId, capturedAt])
 }
 
 model PlanningTeam {
