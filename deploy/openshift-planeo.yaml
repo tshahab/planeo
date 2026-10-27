@@ -248,6 +248,7 @@ metadata:
   name: planeo
   namespace: planeo
 spec:
+  host: plan-uat.teknosys.ai
   to: {kind: Service, name: planeo}
   port: {targetPort: http}
 ---
