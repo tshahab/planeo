@@ -22,12 +22,13 @@ The Docker verification path is green on the current checkout:
 - production-readiness controls: rejection and acceptance cases passed;
 - focused portfolio health tests: passed;
 - browser release smoke: passed in the focused release run.
+- disposable backup/restore drill: database and attachment verification passed with a measured local RTO of 4 seconds.
 
 The Vite config emits an existing `configLoader: native` warning, and the PostgreSQL driver emits a deprecation warning during concurrent test setup; neither causes a test failure.
 
 ## External gates still required
 
-Local verification cannot prove the real staging or production exit criteria. The release owner must still provide a reachable OpenShift/staging cluster, production-only secret values, external database/storage/email/DNS/TLS/monitoring integrations, backup and restore evidence, pilot activity, and 7/30-day telemetry before closing the M3–M5 launch issues.
+Local verification cannot prove the real staging or production exit criteria. The release owner must still provide a reachable OpenShift/staging cluster, production-only secret values, external database/storage/email/DNS/TLS/monitoring integrations, an encrypted off-host backup identifier and restore record, pilot activity, and 7/30-day telemetry before closing the M3–M5 launch issues.
 
 ## Required next run
 
