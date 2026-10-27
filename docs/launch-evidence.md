@@ -11,8 +11,10 @@ This checklist is intentionally evidence-based. A checkbox is complete only when
 - [ ] Attachment storage read/write and signed-download checks passed.
 - [ ] Email delivery test passed and provider response recorded.
 - [ ] DNS/TLS, readiness, liveness, error reporting, and alert routing verified.
+- [ ] Email, webhook, automation, bulk, chat, and SLA workers started successfully; worker queue status output has no unexpected dead letters.
 - [ ] Admin, member, viewer, and enabled portal smoke journeys passed.
 - [ ] Backup, restore, rollback, and support paths confirmed.
+- [ ] Restore drill records the backup completion timestamp, restore result, measured RPO source, and RTO seconds.
 - [ ] Pilot users onboarded with support instructions and incident contact.
 - [ ] First 24-hour review records errors, latency, queue depth, failed deliveries, backups, and user-impacting incidents.
 
@@ -40,6 +42,10 @@ environment:
 owner:
 go/no-go:
 backup id:
+backup completed at:
+restore result:
+rpo source:
+rto seconds:
 image digest:
 test report:
 smoke report:
