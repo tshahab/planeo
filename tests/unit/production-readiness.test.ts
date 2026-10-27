@@ -27,6 +27,7 @@ describe("production readiness controls", () => {
       SESSION_SECRET: "s".repeat(32),
       ATTACHMENT_SIGNING_SECRET: "a".repeat(32),
       AUDIT_EXPORT_KEY: "k".repeat(32),
+      APP_URL: "https://plan-uat.teknosys.ai",
     })();
     expect(output).toContain("Production environment validated");
   });
