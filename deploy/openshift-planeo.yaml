@@ -182,8 +182,7 @@ spec:
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
-            - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SESSION_SECRET, optional: true}}}
-            - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET, optional: true}}}
+            - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET}}}
           command: [node, ops/webhook-worker.mjs]
 ---
 apiVersion: apps/v1
@@ -237,8 +236,7 @@ spec:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
             - {name: APP_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: APP_URL, optional: true}}}
             - {name: CHAT_PROVIDER_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: CHAT_PROVIDER_URL, optional: true}}}
-            - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SESSION_SECRET, optional: true}}}
-            - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET, optional: true}}}
+            - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET}}}
           command: [node, ops/chat-worker.mjs]
 ---
 apiVersion: apps/v1

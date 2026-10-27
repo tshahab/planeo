@@ -9,6 +9,7 @@ The secret must contain:
 - `DATABASE_URL` — PostgreSQL connection string for the migration job and application;
 - `POSTGRES_PASSWORD` — database bootstrap password used by the PostgreSQL container;
 - `SESSION_SECRET` — at least 32 random characters and never the development value;
+- `WEBHOOK_ENCRYPTION_SECRET` — at least 32 independent random characters for webhook/chat workers;
 - `ATTACHMENT_SIGNING_SECRET` — at least 32 independent random characters;
 - `AUDIT_EXPORT_KEY` — at least 32 independent random characters;
 - `APP_URL` — the HTTPS public application URL;
