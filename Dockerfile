@@ -37,6 +37,8 @@ RUN mkdir -p /app/storage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD node -e "fetch('http://localhost:3000/api/health/ready').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"
 CMD ["node", "server.js"]

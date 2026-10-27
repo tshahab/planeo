@@ -37,6 +37,7 @@ services:
       DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
       ATTACHMENT_SIGNING_SECRET: ${ATTACHMENT_SIGNING_SECRET:?set ATTACHMENT_SIGNING_SECRET}
+      AUDIT_EXPORT_KEY: ${AUDIT_EXPORT_KEY:?set AUDIT_EXPORT_KEY}
       ATTACHMENT_STORAGE_ROOT: /app/storage
       NEXT_TELEMETRY_DISABLED: "1"
     volumes:
@@ -74,6 +75,45 @@ services:
       migrate:
         condition: service_completed_successfully
     command: ["pnpm", "sla:worker"]
+    restart: unless-stopped
+
+  automation-worker:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["pnpm", "automation:worker"]
+    restart: unless-stopped
+
+  bulk-worker:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["pnpm", "bulk:worker"]
+    restart: unless-stopped
+
+  chat-worker:
+    build:
+      context: .
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      APP_URL: ${APP_URL:?set APP_URL}
+      CHAT_PROVIDER_URL: ${CHAT_PROVIDER_URL:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["pnpm", "chat:worker"]
     restart: unless-stopped
 
   webhook-worker:

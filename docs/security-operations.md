@@ -29,12 +29,14 @@ Standard responses include HSTS, frame denial, MIME sniffing protection, a restr
 
 ## Pilot deployment and verification
 
-Planeo's staging profile uses the production image, a migration job that must complete before startup, a durable PostgreSQL volume, and a separate durable attachment volume. Copy secrets from the deployment secret manager into the environment; never commit them.
+Planeo's staging profile uses the production image, a migration job that must complete before startup, a durable PostgreSQL volume, a separate durable attachment volume, and all six queue workers: email, webhook, automation, bulk, chat, and SLA. Copy secrets from the deployment secret manager into the environment; never commit them.
 
 ```bash
 export POSTGRES_PASSWORD='replace-with-a-random-value'
 export SESSION_SECRET='replace-with-at-least-32-random-characters'
 export ATTACHMENT_SIGNING_SECRET='replace-with-an-independent-random-value'
+export AUDIT_EXPORT_KEY='replace-with-an-independent-audit-export-key'
+export APP_URL='https://staging.example.com'
 docker compose -f compose.staging.yaml up -d --build database migrate app
 docker compose -f compose.staging.yaml run --rm smoke
 ```
@@ -55,6 +57,8 @@ Essential pilot alerts:
 - PostgreSQL capacity above 80%, failed migration, or failed daily backup;
 - attachment volume above 80% or repeated object read/write failures;
 - no successful restore drill recorded within 90 days.
+
+Run `pnpm worker:status` from the release image on the worker monitoring interval. It emits JSON counts for email, webhook, automation, bulk, and chat queues and exits with status 2 when any queue contains dead-letter work; alert on that result and retain the output with the incident evidence.
 
 The `X-Request-Id` response header is safe to share with support and correlates user reports with JSON logs. Monitoring integrations should preserve it and the workspace ID while applying the same redaction rules tested in `tests/unit/observability.test.ts`.
 

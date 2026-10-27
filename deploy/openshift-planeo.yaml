@@ -1,0 +1,199 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: planeo
+  namespace: planeo
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: planeo
+  namespace: planeo
+spec:
+  runPolicy: SerialLatestOnly
+  source:
+    binary: {}
+  strategy:
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: planeo:latest
+  triggers: []
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: planeo-postgres
+  namespace: planeo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: planeo-attachments
+  namespace: planeo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: planeo-db
+  namespace: planeo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: planeo
+spec:
+  selector: {app: postgres}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: planeo
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: postgres}}
+  template:
+    metadata: {labels: {app: postgres}}
+    spec:
+      serviceAccountName: planeo-db
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: [{containerPort: 5432}]
+          env:
+            - name: POSTGRES_DB
+              value: planeo
+            - name: POSTGRES_USER
+              value: planeo
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: planeo-runtime, key: POSTGRES_PASSWORD}}
+          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+          readinessProbe:
+            exec: {command: [sh, -c, 'pg_isready -U planeo -d planeo']}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes: [{name: data, persistentVolumeClaim: {claimName: planeo-postgres}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: planeo-migrate
+  namespace: planeo
+spec:
+  backoffLimit: 3
+  template:
+    metadata: {labels: {app: planeo-migrate}}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          command: [node, node_modules/prisma/build/index.js, migrate, deploy]
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: planeo
+  namespace: planeo
+spec:
+  selector: {app: planeo}
+  ports: [{name: http, port: 80, targetPort: 3000}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: planeo
+  namespace: planeo
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planeo}}
+  template:
+    metadata: {labels: {app: planeo}}
+    spec:
+      containers:
+        - name: app
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          imagePullPolicy: Always
+          ports: [{containerPort: 3000}]
+          envFrom: [{secretRef: {name: planeo-runtime}}]
+          volumeMounts: [{name: attachments, mountPath: /app/storage}]
+          readinessProbe:
+            httpGet: {path: /api/health/ready, port: 3000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /api/health/live, port: 3000}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes: [{name: attachments, persistentVolumeClaim: {claimName: planeo-attachments}}]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: planeo
+  namespace: planeo
+spec:
+  to: {kind: Service, name: planeo}
+  port: {targetPort: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: planeo-runtime-egress
+  namespace: planeo
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [planeo, postgres, planeo-migrate]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 177.30.0.10/32
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

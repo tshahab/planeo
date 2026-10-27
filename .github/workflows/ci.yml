@@ -25,8 +25,18 @@ jobs:
       - name: Validate, lint, type-check, and build
         run: docker build --target builder --tag planeo-ci:${{ github.sha }} .
 
+      - name: Validate immutable deployment manifest rendering
+        env:
+          RELEASE_TAG: ci-${{ github.sha }}
+        run: |
+          docker run --rm -e RELEASE_TAG="$RELEASE_TAG" -v "$PWD:/app" -w /app node:22-alpine \
+            sh -c 'corepack enable && pnpm install --frozen-lockfile --ignore-scripts && pnpm release:render /tmp/planeo-release.yaml && ! grep -E "release-placeholder|planeo:latest" /tmp/planeo-release.yaml'
+
       - name: Run unit and integration tests
         run: docker compose -f compose.test.yaml run --rm tests
+
+      - name: Check worker queue health
+        run: docker compose -f compose.test.yaml run --rm tests sh -c 'pnpm db:deploy && pnpm worker:status'
 
       - name: Run browser and accessibility tests
         run: docker compose -f compose.test.yaml run --rm e2e

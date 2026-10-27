@@ -4,7 +4,7 @@
 
 - Product: Ticketing
 - Version: 0.1
-- Status: Draft for validation
+- Status: Pilot scope frozen; implementation acceptance is defined in [the pilot launch contract](launch-contract.md)
 - Initial release: Web MVP
 - Product approach: Kanban-first Jira alternative
 

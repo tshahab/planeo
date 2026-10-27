@@ -9,8 +9,8 @@ type Detail = { scenario: Scenario; changes: Change[]; baselines: Array<{ id: st
 
 export function PlanningScenarios({ planId, items }: { planId: string; items: Item[] }) {
   const [scenarios, setScenarios] = useState<Scenario[]>([]), [active, setActive] = useState(""), [detail, setDetail] = useState<Detail | null>(null), [name, setName] = useState(""), [issueId, setIssueId] = useState(""), [dueDate, setDueDate] = useState(""), [baseline, setBaseline] = useState(""), [selected, setSelected] = useState<string[]>([]), [status, setStatus] = useState("");
-  async function load() { const body = await fetch(`/api/plans/${planId}/scenarios`).then(value => value.json()); setScenarios(body.scenarios ?? []); }
-  async function loadDetail(id: string) { const body = await fetch(`/api/plans/${planId}/scenarios/${id}`).then(value => value.json()); setDetail(body.scenario ? body : null); setSelected((body.changes ?? []).map((change: Change) => change.id)); }
+  async function load() { const body = await fetch(`/api/plans/${planId}/scenarios`, { cache: "no-store" }).then(value => value.json()); setScenarios(body.scenarios ?? []); }
+  async function loadDetail(id: string) { const body = await fetch(`/api/plans/${planId}/scenarios/${id}`, { cache: "no-store" }).then(value => value.json()); setDetail(body.scenario ? body : null); setSelected((body.changes ?? []).map((change: Change) => change.id)); }
   useEffect(() => { setActive(""); setDetail(null); void load(); }, [planId]);
   useEffect(() => { if (active) void loadDetail(active); }, [active]);
   async function create() { const response = await fetch(`/api/plans/${planId}/scenarios`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }), body = await response.json(); if (!response.ok) return setStatus(body.error); setName(""); setActive(body.scenario.id); await load(); }

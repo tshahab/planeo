@@ -11,6 +11,10 @@ This product, including its requirements, design, implementation, tests, and doc
 - [Product and technical design](docs/design.md)
 - [Delivery roadmap](docs/roadmap.md)
 - [Security and production operations](docs/security-operations.md)
+- [Pilot launch contract](docs/launch-contract.md)
+- [Production runbook](docs/production-runbook.md)
+- [Verification baseline](docs/verification-baseline.md)
+- [Launch and post-launch evidence](docs/launch-evidence.md)
 
 ## Initial product direction
 
@@ -60,6 +64,6 @@ docker compose -f compose.test.yaml down --volumes
 
 The first command runs the bounded unit and database integration suite. The second starts the test application automatically and runs Chromium onboarding and accessibility scenarios. Playwright writes concise failure artifacts to `test-results/` and `playwright-report/` for CI publication. Focus a suite with `docker compose -f compose.test.yaml run --rm tests pnpm test:unit` or `pnpm test:integration` after the service name.
 
-Production-style Docker deployment, probes, structured logging, durable attachment storage, alerts, backup/restore drills, rollback, and maintenance are documented in [docs/security-operations.md](docs/security-operations.md).
+Production-style Docker deployment, probes, structured logging, durable attachment storage, alerts, backup/restore drills, rollback, and maintenance are documented in the [pilot launch contract](docs/launch-contract.md), [production runbook](docs/production-runbook.md), and [security operations guide](docs/security-operations.md).
 
 Customer portal accounts are separate from agent memberships. Service project administrators invite customers and explicitly grant direct or organization access. Customers activate through the local email outbox, then use `/portal/{workspace-slug}` to create and track private, participant-shared, or explicitly organization-shared requests. Portal authorization is applied independently to forms, search, comments, attachments, notifications, and realtime polling; backing reporter users have no workspace membership and cannot enter the agent application.

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
