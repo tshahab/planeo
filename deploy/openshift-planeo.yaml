@@ -152,6 +152,96 @@ spec:
             periodSeconds: 20
       volumes: [{name: attachments, persistentVolumeClaim: {claimName: planeo-attachments}}]
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planeo-email-worker, namespace: planeo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planeo-worker, worker: email}}
+  template:
+    metadata: {labels: {app: planeo-worker, worker: email}}
+    spec:
+      containers:
+        - name: email
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          envFrom: [{secretRef: {name: planeo-runtime}}]
+          command: [pnpm, email:worker]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planeo-webhook-worker, namespace: planeo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planeo-worker, worker: webhook}}
+  template:
+    metadata: {labels: {app: planeo-worker, worker: webhook}}
+    spec:
+      containers:
+        - name: webhook
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          envFrom: [{secretRef: {name: planeo-runtime}}]
+          command: [pnpm, webhook:worker]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planeo-automation-worker, namespace: planeo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planeo-worker, worker: automation}}
+  template:
+    metadata: {labels: {app: planeo-worker, worker: automation}}
+    spec:
+      containers:
+        - name: automation
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          envFrom: [{secretRef: {name: planeo-runtime}}]
+          command: [pnpm, automation:worker]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planeo-bulk-worker, namespace: planeo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planeo-worker, worker: bulk}}
+  template:
+    metadata: {labels: {app: planeo-worker, worker: bulk}}
+    spec:
+      containers:
+        - name: bulk
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          envFrom: [{secretRef: {name: planeo-runtime}}]
+          command: [pnpm, bulk:worker]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planeo-chat-worker, namespace: planeo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planeo-worker, worker: chat}}
+  template:
+    metadata: {labels: {app: planeo-worker, worker: chat}}
+    spec:
+      containers:
+        - name: chat
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          envFrom: [{secretRef: {name: planeo-runtime}}]
+          command: [pnpm, chat:worker]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planeo-sla-worker, namespace: planeo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planeo-worker, worker: sla}}
+  template:
+    metadata: {labels: {app: planeo-worker, worker: sla}}
+    spec:
+      containers:
+        - name: sla
+          image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
+          envFrom: [{secretRef: {name: planeo-runtime}}]
+          command: [pnpm, sla:worker]
+---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -171,7 +261,7 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [planeo, postgres, planeo-migrate]
+        values: [planeo, planeo-worker, postgres, planeo-migrate]
   policyTypes: [Egress]
   egress:
     - to:

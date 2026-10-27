@@ -30,7 +30,7 @@ jobs:
           RELEASE_TAG: ci-${{ github.sha }}
         run: |
           docker run --rm -e RELEASE_TAG="$RELEASE_TAG" -v "$PWD:/app" -w /app node:22-alpine \
-            sh -c 'corepack enable && pnpm install --frozen-lockfile --ignore-scripts && pnpm release:render /tmp/planeo-release.yaml && ! grep -E "release-placeholder|planeo:latest" /tmp/planeo-release.yaml'
+            sh -c 'corepack enable && pnpm install --frozen-lockfile --ignore-scripts && pnpm release:render /tmp/planeo-release.yaml && ! grep -E "image:.*release-placeholder|image:.*:latest" /tmp/planeo-release.yaml && for worker in email webhook automation bulk chat sla; do grep -q "name: planeo-${worker}-worker" /tmp/planeo-release.yaml; done'
 
       - name: Validate production configuration contract
         run: |
