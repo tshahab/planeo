@@ -7,7 +7,7 @@ import { Avatar } from "./workspace-app";
 import { SlaTargets } from "./sla-targets";
 import { CustomerConversation } from "./customer-conversation";
 
-export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUpdate, onArchive, readOnly = false }: { issue: Issue; statuses: ProjectStatus[]; currentUser: Person; onClose: () => void; onMove: (status: Status) => void; onUpdate: (changes: Record<string, unknown>) => Promise<void>; onArchive?: () => Promise<void>; readOnly?: boolean }) {
+export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUpdate, onArchive, onDelete, readOnly = false }: { issue: Issue; statuses: ProjectStatus[]; currentUser: Person; onClose: () => void; onMove: (status: Status) => void; onUpdate: (changes: Record<string, unknown>) => Promise<void>; onArchive?: () => Promise<void>; onDelete?: () => Promise<void>; readOnly?: boolean }) {
   const people = [currentUser];
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<Array<{ id: string; body: string; createdAt: string; author: { id: string; name: string } }>>([]);
@@ -115,7 +115,7 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
     <div className="panel-layer">
       <button className="panel-scrim" onClick={onClose} aria-label="Close issue" />
       <aside className="issue-panel" aria-label={`${issue.key} details`}>
-        <header className="panel-header"><div className="panel-key"><span>{issue.key.split("-")[0]}</span><span>/</span><strong>{issue.key}</strong></div><div><button aria-label={watching ? "Stop watching issue" : "Watch issue"} aria-pressed={watching} onClick={() => void toggleWatching()}><Bell size={17} fill={watching ? "currentColor" : "none"} /></button><button aria-label="Copy link"><Link2 size={17} /></button>{onArchive && <button aria-label="Archive issue" onClick={() => window.confirm(`Archive ${issue.key}?`) && void onArchive()}><MoreHorizontal size={18} /></button>}<button aria-label="Close" onClick={onClose}><X size={20} /></button></div></header>
+        <header className="panel-header"><div className="panel-key"><span>{issue.key.split("-")[0]}</span><span>/</span><strong>{issue.key}</strong></div><div><button aria-label={watching ? "Stop watching issue" : "Watch issue"} aria-pressed={watching} onClick={() => void toggleWatching()}><Bell size={17} fill={watching ? "currentColor" : "none"} /></button><button aria-label="Copy link"><Link2 size={17} /></button>{onArchive && <button aria-label="Archive issue" onClick={() => window.confirm(`Archive ${issue.key}?`) && void onArchive()}><MoreHorizontal size={18} /></button>}{onDelete && <button className="danger-button" onClick={() => window.confirm(`Delete ${issue.key}? This will remove it from the active workspace.`) && void onDelete()}>Delete</button>}<button aria-label="Close" onClick={onClose}><X size={20} /></button></div></header>
         <div className="panel-body">
           <main className="issue-main">
             <SlaTargets endpoint={`/api/issues/${issue.id}/sla`} agent={!readOnly} />

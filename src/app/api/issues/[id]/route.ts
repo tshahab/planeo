@@ -12,6 +12,24 @@ import { enqueueAutomation } from "@/lib/automation";
 import { publishRealtime } from "@/lib/realtime";
 import { canViewIssue, requireProjectPermission } from "@/lib/permissions";
 
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const context = await getAuthContext();
+  if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const { id } = await params;
+  const issue = await db.issue.findFirst({
+    where: { id, workspaceId: context.workspace.id, archivedAt: null },
+    include: { project: { select: { id: true, key: true } } },
+  });
+  if (!issue) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
+  const membership = await db.projectMember.findUnique({ where: { projectId_userId: { projectId: issue.project.id, userId: context.user.id } } });
+  if (!["OWNER", "ADMIN"].includes(context.role) && membership?.role !== "ADMIN") return NextResponse.json({ error: "Project administration is required." }, { status: 403 });
+  await db.$transaction([
+    db.issue.update({ where: { id }, data: { archivedAt: new Date(), version: { increment: 1 } } }),
+    db.auditEvent.create({ data: { workspaceId: context.workspace.id, actorId: context.user.id, action: "issue.deleted", targetType: "issue", targetId: id, metadata: { projectId: issue.project.id, key: `${issue.project.key}-${issue.number}` } } }),
+  ]);
+  return NextResponse.json({ deleted: true });
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getAuthContext();
   if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
