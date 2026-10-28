@@ -23,5 +23,5 @@ export async function consumeRateLimit(identifier: string, limit: number, window
 
 export function requestClientKey(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",").map((value) => value.trim()).filter(Boolean).at(-1);
-  return forwarded || request.headers.get("x-real-ip") || "unknown";
+  return forwarded || "unknown";
 }
