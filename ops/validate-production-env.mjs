@@ -1,4 +1,4 @@
-const required = ["DATABASE_URL", "SESSION_SECRET", "ATTACHMENT_SIGNING_SECRET", "AUDIT_EXPORT_KEY"];
+const required = ["DATABASE_URL", "SESSION_SECRET", "WEBHOOK_ENCRYPTION_SECRET", "ATTACHMENT_SIGNING_SECRET", "AUDIT_EXPORT_KEY"];
 const forbidden = new Set([
   "docker-development-secret-change-before-production",
   "planeo-demo",
@@ -9,6 +9,13 @@ const missing = required.filter((name) => !process.env[name] || process.env[name
 const developmentValues = required.filter((name) => forbidden.has(process.env[name]));
 const database = process.env.DATABASE_URL ?? "";
 if (database && !/^postgres(?:ql)?:\/\//.test(database)) missing.push("DATABASE_URL (PostgreSQL URL required)");
+const smtpHost = process.env.SMTP_HOST?.trim() ?? "";
+const smtpPort = Number(process.env.SMTP_PORT ?? 25);
+const smtpFrom = process.env.SMTP_FROM?.trim() ?? "";
+const emailProviderUrl = process.env.EMAIL_PROVIDER_URL?.trim() ?? "";
+const validHttpEmailProvider = emailProviderUrl.startsWith("https://");
+const validSmtpProvider = Boolean(smtpHost && smtpFrom && Number.isInteger(smtpPort) && smtpPort >= 1 && smtpPort <= 65535);
+if (!validHttpEmailProvider && !validSmtpProvider) missing.push("email provider (HTTPS EMAIL_PROVIDER_URL or SMTP_HOST/SMTP_PORT/SMTP_FROM required)");
 const appUrl = process.env.APP_URL?.trim() ?? "";
 let validAppUrl = false;
 try {

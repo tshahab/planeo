@@ -38,8 +38,13 @@ jobs:
             -e NODE_ENV=production \
             -e DATABASE_URL=postgresql://ci.example.internal/planeo-production \
             -e SESSION_SECRET=ci-session-secret-with-at-least-thirty-two-characters \
+            -e WEBHOOK_ENCRYPTION_SECRET=ci-webhook-encryption-secret-with-at-least-thirty-two-characters \
             -e ATTACHMENT_SIGNING_SECRET=ci-attachment-secret-with-at-least-thirty-two-characters \
             -e AUDIT_EXPORT_KEY=ci-audit-export-key-with-at-least-thirty-two-characters \
+            -e APP_URL=https://ci.example.internal \
+            -e SMTP_HOST=smtp.example.internal \
+            -e SMTP_PORT=25 \
+            -e SMTP_FROM=no-reply@example.internal \
             planeo-ci:${{ github.sha }} pnpm production:validate
 
       - name: Run unit and integration tests
@@ -55,9 +60,13 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-staging-database-secret
           SESSION_SECRET: ci-session-secret-with-at-least-thirty-two-characters
+          WEBHOOK_ENCRYPTION_SECRET: ci-webhook-encryption-secret-with-at-least-thirty-two-characters
           ATTACHMENT_SIGNING_SECRET: ci-attachment-secret-with-at-least-thirty-two-characters
           AUDIT_EXPORT_KEY: ci-audit-export-key-with-at-least-thirty-two-characters
-          APP_URL: http://app:3000
+          APP_URL: https://ci.example.internal
+          SMTP_HOST: smtp.example.internal
+          SMTP_PORT: "25"
+          SMTP_FROM: no-reply@example.internal
         run: docker compose -f compose.staging.yaml up --build --abort-on-container-exit --exit-code-from smoke smoke
 
       - name: Publish browser diagnostics
@@ -74,4 +83,4 @@ jobs:
         if: always()
         run: |
           docker compose -f compose.test.yaml down --volumes
-          POSTGRES_PASSWORD=cleanup SESSION_SECRET=cleanup-secret-with-at-least-thirty-two-characters ATTACHMENT_SIGNING_SECRET=cleanup-secret-with-at-least-thirty-two-characters AUDIT_EXPORT_KEY=cleanup-audit-export-key-with-at-least-thirty-two-characters APP_URL=http://app:3000 docker compose -f compose.staging.yaml down --volumes
+          POSTGRES_PASSWORD=cleanup SESSION_SECRET=cleanup-secret-with-at-least-thirty-two-characters WEBHOOK_ENCRYPTION_SECRET=cleanup-webhook-encryption-secret-with-at-least-thirty-two-characters ATTACHMENT_SIGNING_SECRET=cleanup-secret-with-at-least-thirty-two-characters AUDIT_EXPORT_KEY=cleanup-audit-export-key-with-at-least-thirty-two-characters APP_URL=http://app:3000 docker compose -f compose.staging.yaml down --volumes

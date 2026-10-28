@@ -75,9 +75,19 @@ spec:
     spec:
       serviceAccountName: planeo-db
       automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+        runAsNonRoot: true
       containers:
         - name: postgres
           image: postgres:16-alpine
+          securityContext:
+            runAsUser: 70
+            runAsGroup: 70
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
           ports: [{containerPort: 5432}]
           env:
             - name: POSTGRES_DB
@@ -185,6 +195,13 @@ spec:
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
             - {name: EMAIL_PROVIDER_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: EMAIL_PROVIDER_URL, optional: true}}}
+            - {name: SMTP_HOST, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_HOST, optional: true}}}
+            - {name: SMTP_PORT, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_PORT, optional: true}}}
+            - {name: SMTP_FROM, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_FROM, optional: true}}}
+            - {name: SMTP_SECURE, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_SECURE, optional: true}}}
+            - {name: SMTP_REQUIRE_TLS, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_REQUIRE_TLS, optional: true}}}
+            - {name: SMTP_USERNAME, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_USERNAME, optional: true}}}
+            - {name: SMTP_PASSWORD, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_PASSWORD, optional: true}}}
           command: [node, ops/email-worker.mjs]
 ---
 apiVersion: apps/v1

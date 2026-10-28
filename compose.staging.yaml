@@ -36,7 +36,12 @@ services:
     environment:
       DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      WEBHOOK_ENCRYPTION_SECRET: ${WEBHOOK_ENCRYPTION_SECRET:?set WEBHOOK_ENCRYPTION_SECRET}
       APP_URL: ${APP_URL:?set APP_URL}
+      EMAIL_PROVIDER_URL: ${EMAIL_PROVIDER_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-25}
+      SMTP_FROM: ${SMTP_FROM:-}
       ATTACHMENT_SIGNING_SECRET: ${ATTACHMENT_SIGNING_SECRET:?set ATTACHMENT_SIGNING_SECRET}
       AUDIT_EXPORT_KEY: ${AUDIT_EXPORT_KEY:?set AUDIT_EXPORT_KEY}
       ATTACHMENT_STORAGE_ROOT: /app/storage
@@ -59,6 +64,13 @@ services:
     environment:
       DATABASE_URL: postgresql://planeo:${POSTGRES_PASSWORD}@database:5432/planeo
       EMAIL_PROVIDER_URL: ${EMAIL_PROVIDER_URL:-http://mail-capture:8025/messages}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-25}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-false}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       APP_URL: ${APP_URL:-http://app:3000}
     depends_on:
       migrate:

@@ -30,9 +30,13 @@ describe("production readiness controls", () => {
       NODE_ENV: "production",
       DATABASE_URL: "postgresql://prod.example/planeo",
       SESSION_SECRET: "s".repeat(32),
+      WEBHOOK_ENCRYPTION_SECRET: "w".repeat(32),
       ATTACHMENT_SIGNING_SECRET: "a".repeat(32),
       AUDIT_EXPORT_KEY: "k".repeat(32),
       APP_URL: "https://plan-uat.teknosys.ai",
+      SMTP_HOST: "smtp.example.test",
+      SMTP_PORT: "25",
+      SMTP_FROM: "no-reply@example.test",
     })();
     expect(output).toContain("Production environment validated");
   });

@@ -4,7 +4,9 @@ Planeo writes email deliveries to `EmailDelivery` in the same database transacti
 
 ## Development
 
-`docker compose up` starts the worker and a local capture provider. Captured messages are available as JSON at `http://localhost:8025/messages`. Set `APP_URL` to the browser-visible Planeo origin. Production must set `EMAIL_PROVIDER_URL` to an HTTPS endpoint accepting the documented JSON payload and honoring the `Idempotency-Key` header.
+`docker compose up` starts the worker and a local capture provider. Captured messages are available as JSON at `http://localhost:8025/messages`. Set `APP_URL` to the browser-visible Planeo origin.
+
+Production can use either an HTTPS gateway or SMTP. For the gateway, set `EMAIL_PROVIDER_URL` to an HTTPS endpoint accepting the documented JSON payload and honoring the `Idempotency-Key` header. For SMTP, set `SMTP_HOST`, `SMTP_PORT`, and `SMTP_FROM`; optional settings are `SMTP_SECURE`, `SMTP_REQUIRE_TLS`, and the `SMTP_USERNAME`/`SMTP_PASSWORD` pair. SMTP is selected whenever `SMTP_HOST` is present. Keep deployment values in the environment or namespace Secret, never in the repository.
 
 ## Operations
 
