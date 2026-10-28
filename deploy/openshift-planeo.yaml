@@ -103,6 +103,7 @@ spec:
   template:
     metadata: {labels: {app: planeo-migrate}}
     spec:
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       restartPolicy: OnFailure
       automountServiceAccountToken: false
       containers:
