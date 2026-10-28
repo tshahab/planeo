@@ -11,11 +11,12 @@ describe("pinned webhook delivery", () => {
   });
 
   it("connects to the validated IP while preserving hostname SNI and Host", async () => {
-    const response = new EventEmitter() as EventEmitter & { statusCode: number; headers: Record<string, string> };
+    type TestResponse = EventEmitter & { statusCode: number; headers: Record<string, string>; resume: () => void };
+    const response = new EventEmitter() as TestResponse;
     response.statusCode = 204;
     response.headers = {};
-    (response as typeof response & { resume: () => void }).resume = vi.fn();
-    const request = vi.fn((options: Record<string, unknown>, callback: (response: typeof response) => void) => {
+    response.resume = vi.fn();
+    const request = vi.fn((options: Record<string, unknown>, callback: (response: TestResponse) => void) => {
       const client = new EventEmitter() as EventEmitter & { end: (body?: string) => void; setTimeout: () => void; destroy: (error: Error) => void };
       client.setTimeout = vi.fn();
       client.destroy = vi.fn();
