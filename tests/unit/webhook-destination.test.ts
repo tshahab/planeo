@@ -29,6 +29,9 @@ describe("pinned webhook delivery", () => {
 
   it("keeps private and mapped addresses blocked", () => {
     expect(isPrivateAddress("::ffff:127.0.0.1")).toBe(true);
+    expect(isPrivateAddress("::127.0.0.1")).toBe(true);
+    expect(isPrivateAddress("::10.0.0.1")).toBe(true);
+    expect(isPrivateAddress("::192.168.1.1")).toBe(true);
     expect(isPrivateAddress("8.8.8.8")).toBe(false);
   });
 });

@@ -22,6 +22,10 @@ export function isPrivateAddress(address:string):boolean{
   }
   if(isIP(normalized)!==6)return true;
   const hextets=ipv6Hextets(normalized);if(!hextets)return true;
+  if(hextets.slice(0,6).every(value=>value===0)){
+    const embedded=`${hextets[6]>>8}.${hextets[6]&255}.${hextets[7]>>8}.${hextets[7]&255}`;
+    if(isPrivateAddress(embedded))return true;
+  }
   const mapped=normalized.startsWith("::ffff:")?normalized.slice(7):null;
   return Boolean(mapped&&isPrivateAddress(mapped))||hextets[0]===0||hextets[0]===0xffff||(hextets[0]&0xfe00)===0xfc00||(hextets[0]&0xffc0)===0xfe80||(hextets[0]&0xff00)===0xff00;
 }

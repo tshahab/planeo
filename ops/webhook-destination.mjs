@@ -12,7 +12,15 @@ export function isPrivateAddress(address) {
   const normalized = String(address).trim().toLowerCase(), mapped = normalized.startsWith("::ffff:") ? normalized.slice(7) : null;
   if (mapped && isPrivateAddress(mapped)) return true;
   if (ipv4(normalized) !== null) return inRange(normalized,0,0x00ffffff)||inRange(normalized,0x0a000000,0x0affffff)||inRange(normalized,0x64400000,0x647fffff)||inRange(normalized,0x7f000000,0x7fffffff)||inRange(normalized,0xa9fe0000,0xa9feffff)||inRange(normalized,0xac100000,0xac1fffff)||inRange(normalized,0xc0000000,0xc00000ff)||inRange(normalized,0xc0000200,0xc00002ff)||inRange(normalized,0xc0a80000,0xc0a8ffff)||inRange(normalized,0xc6120000,0xc613ffff)||inRange(normalized,0xc6336400,0xc63364ff)||inRange(normalized,0xcb007100,0xcb0071ff)||inRange(normalized,0xe0000000,0xffffffff)||inRange(normalized,0x0a800000,0x0a83ffff)||inRange(normalized,0xac1e0000,0xac1effff)||inRange(normalized,0xb11e0000,0xb11effff);
-  return isIP(normalized)!==6||normalized==="::1"||normalized.startsWith("fc")||normalized.startsWith("fd")||normalized.startsWith("fe80")||normalized.startsWith("ff")||normalized.startsWith("0:");
+  if (isIP(normalized)!==6) return true;
+  const groups = normalized.split("::");
+  if (groups.length === 2 && groups[0] === "" && groups[1] && !groups[1].includes(":")) {
+    const octets = groups[1].split(".").map(Number);
+    if (octets.length === 4 && octets.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255)) {
+      return isPrivateAddress(octets.join("."));
+    }
+  }
+  return normalized==="::1"||normalized.startsWith("fc")||normalized.startsWith("fd")||normalized.startsWith("fe80")||normalized.startsWith("ff")||normalized.startsWith("0:");
 }
 export async function resolvePinnedHttpsTarget(rawUrl, lookup = dnsLookup) {
   const url = new URL(rawUrl);
