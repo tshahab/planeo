@@ -32,13 +32,13 @@ describe("email provider selection", () => {
         checkServerIdentity: (hostname: string, certificate: { fingerprint256?: string }) => Error | undefined;
       };
     };
-    const createTransport = vi.fn((_options: PinnedTransportOptions) => ({ sendMail: vi.fn(), close: vi.fn() }));
+    const createTransport = vi.fn((_options: Record<string, unknown>) => ({ sendMail: vi.fn().mockResolvedValue({}), close: vi.fn() }));
     createEmailProvider({
       SMTP_HOST: "smtp.internal",
       SMTP_FROM: "no-reply@example.test",
       SMTP_TLS_CERT_FINGERPRINTS: "AA:BB, ccdd",
     }, { createTransport });
-    const options = createTransport.mock.calls[0][0];
+    const options = createTransport.mock.calls[0][0] as unknown as PinnedTransportOptions;
     expect(options.tls.rejectUnauthorized).toBe(true);
     expect(options.tls.checkServerIdentity("smtp.internal", { fingerprint256: "AA:BB" })).toBeUndefined();
     expect(options.tls.checkServerIdentity("smtp.internal", { fingerprint256: "CC:DD" })).toBeUndefined();
