@@ -161,7 +161,16 @@ spec:
             capabilities: {drop: [ALL]}
           imagePullPolicy: Always
           ports: [{containerPort: 3000}]
-          envFrom: [{secretRef: {name: planeo-runtime}}]
+          env:
+            - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
+            - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SESSION_SECRET}}}
+            - {name: WEBHOOK_ENCRYPTION_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: WEBHOOK_ENCRYPTION_SECRET}}}
+            - {name: ATTACHMENT_SIGNING_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: ATTACHMENT_SIGNING_SECRET}}}
+            - {name: AUDIT_EXPORT_KEY, valueFrom: {secretKeyRef: {name: planeo-runtime, key: AUDIT_EXPORT_KEY}}}
+            - {name: SAML_RELAY_SECRET, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SAML_RELAY_SECRET, optional: true}}}
+            - {name: APP_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: APP_URL}}}
+            - {name: PUBLIC_APP_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: PUBLIC_APP_URL, optional: true}}}
+            - {name: PUBLIC_SIGNUP_ENABLED, value: "false"}
           volumeMounts: [{name: attachments, mountPath: /app/storage}]
           readinessProbe:
             httpGet: {path: /api/health/ready, port: 3000}

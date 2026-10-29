@@ -1,13 +1,15 @@
 "use client";
 
 import { Bell, CalendarDays, ChevronDown, Clock3, Link2, MoreHorizontal, Paperclip, Send, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Issue, Person, ProjectStatus, Status } from "@/lib/types";
 import { Avatar } from "./workspace-app";
 import { SlaTargets } from "./sla-targets";
 import { CustomerConversation } from "./customer-conversation";
 
 export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUpdate, onArchive, onDelete, readOnly = false }: { issue: Issue; statuses: ProjectStatus[]; currentUser: Person; onClose: () => void; onMove: (status: Status) => void; onUpdate: (changes: Record<string, unknown>) => Promise<void>; onArchive?: () => Promise<void>; onDelete?: () => Promise<void>; readOnly?: boolean }) {
+  const panelRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
   const people = [currentUser];
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<Array<{ id: string; body: string; createdAt: string; author: { id: string; name: string } }>>([]);
@@ -27,6 +29,21 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
   const [labelDraft, setLabelDraft] = useState("");
   const [watching, setWatching] = useState(false);
   const [development, setDevelopment] = useState<Array<{id:string;kind:string;title:string;url:string;authorName:string|null;targetBranch:string|null;state:string|null;reviewState:string|null;buildState:string|null;repository:{fullName:string;accessible:boolean;connection:{provider:string}}}>>([]);
+
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panelRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      previouslyFocused?.focus();
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -114,14 +131,14 @@ export function IssuePanel({ issue, statuses, currentUser, onClose, onMove, onUp
   return (
     <div className="panel-layer">
       <button className="panel-scrim" onClick={onClose} aria-label="Close issue" />
-      <aside className="issue-panel" aria-label={`${issue.key} details`}>
+      <aside ref={panelRef} className="issue-panel" role="dialog" aria-modal="true" aria-labelledby="issue-panel-title" tabIndex={-1}>
         <header className="panel-header"><div className="panel-key"><span>{issue.key.split("-")[0]}</span><span>/</span><strong>{issue.key}</strong></div><div><button aria-label={watching ? "Stop watching issue" : "Watch issue"} aria-pressed={watching} onClick={() => void toggleWatching()}><Bell size={17} fill={watching ? "currentColor" : "none"} /></button><button aria-label="Copy link"><Link2 size={17} /></button>{onArchive && <button aria-label="Archive issue" onClick={() => window.confirm(`Archive ${issue.key}?`) && void onArchive()}><MoreHorizontal size={18} /></button>}{onDelete && <button className="danger-button" onClick={() => window.confirm(`Delete ${issue.key}? This will remove it from the active workspace.`) && void onDelete()}>Delete</button>}<button aria-label="Close" onClick={onClose}><X size={20} /></button></div></header>
         <div className="panel-body">
           <main className="issue-main">
             <SlaTargets endpoint={`/api/issues/${issue.id}/sla`} agent={!readOnly} />
             <CustomerConversation key={issue.id} issueId={issue.id} readOnly={readOnly} />
             <div className="issue-type-line"><span className={`type-pill ${issue.type.toLowerCase()}`}>{issue.type}</span><span>Created {issue.createdAt ? formatTime(issue.createdAt) : "recently"}</span></div>
-            {readOnly ? <h2>{issue.title}</h2> : <input className="issue-title-input" aria-label="Issue title" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} />}
+            {readOnly ? <h2 id="issue-panel-title">{issue.title}</h2> : <input id="issue-panel-title" className="issue-title-input" aria-label="Issue title" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} />}
             <section className="description-section"><h3>Description</h3>{readOnly ? <p>{issue.description}</p> : <><textarea className="issue-description-input" aria-label="Issue description" value={description} maxLength={20000} onChange={(event) => setDescription(event.target.value)} /><button className="secondary-button issue-save-button" disabled={savingDetails || !title.trim() || (title === issue.title && description === issue.description)} onClick={saveDetails}>{savingDetails ? "Saving…" : "Save details"}</button></>}</section>
             <section className="subtask-section"><div><h3>Subtasks</h3><span>{subtasks.filter((item) => item.status === "Done").length} of {subtasks.length}</span></div><div className="progress"><i style={{ width: subtasks.length ? `${subtasks.filter((item) => item.status === "Done").length / subtasks.length * 100}%` : "0%" }} /></div>{subtasks.map((subtask) => <label key={subtask.id}><input type="checkbox" checked={subtask.status === "Done"} disabled={readOnly} onChange={() => void toggleSubtask(subtask)} /><span>{subtask.title}</span><small>{subtask.key}</small></label>)}{!readOnly && <div className="subtask-create"><input aria-label="New subtask title" value={newSubtask} placeholder="Add a subtask" maxLength={200} onChange={(event) => setNewSubtask(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void addSubtask(); }} /><button disabled={!newSubtask.trim() || addingSubtask} onClick={addSubtask}>{addingSubtask ? "Adding…" : "Add"}</button></div>}</section>
             <section className="activity-section"><div className="activity-heading"><h3>Activity</h3><button>All activity <ChevronDown size={14} /></button></div>{attachments.length > 0 && <div className="attachment-list">{attachments.map((item) => <a key={item.id} href={`/api/attachments/${item.id}`}><Paperclip size={14} /><span>{item.fileName}</span><small>{formatBytes(item.size)}</small></a>)}</div>}{!readOnly && <div className="comment-box"><Avatar person={people[0]} /><div><textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Add a comment…" /><div><label className={uploadingAttachment ? "uploading" : ""}><Paperclip size={15} /> {uploadingAttachment ? "Uploading…" : "Attach"}<input type="file" disabled={uploadingAttachment} accept="image/*,.pdf,.zip,.json,.txt,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAttachment(file); event.target.value = ""; }} /></label><button disabled={!comment.trim() || submittingComment} onClick={submitComment}><Send size={14} /> {submittingComment ? "Posting…" : "Comment"}</button></div></div></div>}{activityError && <div className="members-error">{activityError}</div>}{comments.map((item) => <div className="activity-item" key={item.id}><Avatar person={{ name: item.author.name, initials: initials(item.author.name), color: colorFor(item.author.id) }} /><div><p><strong>{item.author.name}</strong> added a comment</p><blockquote>{item.body}</blockquote><span>{formatTime(item.createdAt)}</span></div></div>)}{activities.map((item) => <div className="activity-item" key={item.id}><Avatar person={{ name: item.actor?.name ?? "System", initials: initials(item.actor?.name ?? "System"), color: colorFor(item.actor?.id ?? item.id) }} /><div><p><strong>{item.actor?.name ?? "System"}</strong> {activityLabel(item.action)}</p><span>{formatTime(item.createdAt)}</span></div></div>)}</section>

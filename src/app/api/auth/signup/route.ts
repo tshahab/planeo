@@ -3,6 +3,9 @@ import { createSession, hashPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production" && process.env.PUBLIC_SIGNUP_ENABLED !== "true") {
+    return NextResponse.json({ error: "Public workspace creation is disabled." }, { status: 404 });
+  }
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const name = typeof body?.name === "string" ? body.name.trim() : ""; const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : ""; const password = typeof body?.password === "string" ? body.password : ""; const workspaceName = typeof body?.workspaceName === "string" ? body.workspaceName.trim() : ""; const slug = typeof body?.slug === "string" ? body.slug.trim().toLowerCase() : "";
   if (name.length < 2 || name.length > 80 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || workspaceName.length < 2 || workspaceName.length > 80 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 48) return NextResponse.json({ error: "Enter a valid name, email, workspace name, and unique lowercase slug." }, { status: 400 });

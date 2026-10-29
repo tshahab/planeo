@@ -4,5 +4,6 @@ import { getAuthContext } from "@/lib/auth";
 
 export default async function LoginPage() {
   if (await getAuthContext()) redirect("/");
-  return <LoginForm demoMode={process.env.NODE_ENV !== "production"} />;
+  const demoMode = process.env.NODE_ENV !== "production";
+  return <LoginForm demoMode={demoMode} publicSignup={demoMode || process.env.PUBLIC_SIGNUP_ENABLED === "true"} />;
 }
