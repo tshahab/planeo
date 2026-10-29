@@ -79,6 +79,7 @@ spec:
         runAsUser: 70
         runAsGroup: 70
         runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -453,3 +454,14 @@ spec:
   podSelector:
     matchLabels: {app: planeo-worker}
   policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: planeo-postgres-egress
+  namespace: planeo
+spec:
+  podSelector:
+    matchLabels: {app: postgres}
+  policyTypes: [Egress]
+  egress: []

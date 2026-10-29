@@ -128,6 +128,7 @@ services:
     environment:
       DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
       SESSION_SECRET: docker-test-secret-with-at-least-thirty-two-characters
+      APP_URL: http://test-app:3000
       NEXT_TELEMETRY_DISABLED: "1"
       IDENTITY_RATE_LIMIT: "30"
     depends_on:

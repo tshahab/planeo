@@ -36,12 +36,23 @@ describe("email provider selection", () => {
     createEmailProvider({
       SMTP_HOST: "smtp.internal",
       SMTP_FROM: "no-reply@example.test",
+      SMTP_REQUIRE_TLS: "true",
       SMTP_TLS_CERT_FINGERPRINTS: "AA:BB, ccdd",
     }, { createTransport });
     const options = createTransport.mock.calls[0][0] as unknown as PinnedTransportOptions;
     expect(options.tls.rejectUnauthorized).toBe(true);
     expect(options.tls.checkServerIdentity("smtp.internal", { fingerprint256: "AA:BB" })).toBeUndefined();
     expect(options.tls.checkServerIdentity("smtp.internal", { fingerprint256: "CC:DD" })).toBeUndefined();
+    expect(options.tls.checkServerIdentity("smtp.internal", { fingerprint256: "EE:FF" })).toEqual(expect.any(Error));
+    expect(options.tls.checkServerIdentity("smtp.internal", {})).toEqual(expect.any(Error));
+  });
+
+  it("requires STARTTLS whenever certificate pins are configured", () => {
+    expect(() => createEmailProvider({
+      SMTP_HOST: "smtp.internal",
+      SMTP_FROM: "no-reply@example.test",
+      SMTP_TLS_CERT_FINGERPRINTS: "AA:BB",
+    })).toThrow(/SMTP_REQUIRE_TLS/);
   });
 
   it("requires a sender and complete optional authentication", () => {

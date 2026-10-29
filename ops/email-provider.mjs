@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import tls from "node:tls";
 
 const boolean = (value, fallback = false) => value == null || value === "" ? fallback : value === "true";
 
@@ -14,23 +13,25 @@ export function createEmailProvider(env = process.env, dependencies = {}) {
     const password = env.SMTP_PASSWORD;
     if (Boolean(username) !== Boolean(password)) throw new Error("SMTP_USERNAME and SMTP_PASSWORD must be configured together");
     const createTransport = dependencies.createTransport ?? nodemailer.createTransport;
+    const requireTLS = boolean(env.SMTP_REQUIRE_TLS);
     const pinnedFingerprints = new Set((env.SMTP_TLS_CERT_FINGERPRINTS ?? "")
       .split(",")
       .map((value) => value.replaceAll(":", "").trim().toUpperCase())
       .filter(Boolean));
+    if (pinnedFingerprints.size && !requireTLS) throw new Error("SMTP_REQUIRE_TLS must be true when SMTP certificate fingerprints are configured");
     const tlsOptions = { rejectUnauthorized: boolean(env.SMTP_TLS_REJECT_UNAUTHORIZED, true) };
     if (pinnedFingerprints.size) {
-      tlsOptions.checkServerIdentity = (hostname, certificate) => {
+      tlsOptions.checkServerIdentity = (_hostname, certificate) => {
         const fingerprint = certificate.fingerprint256?.replaceAll(":", "").toUpperCase();
         if (fingerprint && pinnedFingerprints.has(fingerprint)) return undefined;
-        return tls.checkServerIdentity(hostname, certificate);
+        return new Error("SMTP certificate fingerprint is not pinned");
       };
     }
     const transport = createTransport({
       host: smtpHost,
       port,
       secure: boolean(env.SMTP_SECURE, port === 465),
-      requireTLS: boolean(env.SMTP_REQUIRE_TLS),
+      requireTLS,
       tls: tlsOptions,
       auth: username ? { user: username, pass: password } : undefined,
       connectionTimeout: 10_000,
