@@ -26,16 +26,22 @@ describe("email provider selection", () => {
   });
 
   it("pins an explicitly trusted internal relay certificate", () => {
-    const createTransport = vi.fn(() => ({ sendMail: vi.fn(), close: vi.fn() }));
+    type PinnedTransportOptions = {
+      tls: {
+        rejectUnauthorized: boolean;
+        checkServerIdentity: (hostname: string, certificate: { fingerprint256?: string }) => Error | undefined;
+      };
+    };
+    const createTransport = vi.fn((_options: PinnedTransportOptions) => ({ sendMail: vi.fn(), close: vi.fn() }));
     createEmailProvider({
       SMTP_HOST: "smtp.internal",
       SMTP_FROM: "no-reply@example.test",
       SMTP_TLS_CERT_FINGERPRINTS: "AA:BB, ccdd",
     }, { createTransport });
-    const options = createTransport.mock.calls[0]?.[0];
-    expect(options?.tls.rejectUnauthorized).toBe(true);
-    expect(options?.tls.checkServerIdentity("smtp.internal", { fingerprint256: "AA:BB" })).toBeUndefined();
-    expect(options?.tls.checkServerIdentity("smtp.internal", { fingerprint256: "CC:DD" })).toBeUndefined();
+    const options = createTransport.mock.calls[0][0];
+    expect(options.tls.rejectUnauthorized).toBe(true);
+    expect(options.tls.checkServerIdentity("smtp.internal", { fingerprint256: "AA:BB" })).toBeUndefined();
+    expect(options.tls.checkServerIdentity("smtp.internal", { fingerprint256: "CC:DD" })).toBeUndefined();
   });
 
   it("requires a sender and complete optional authentication", () => {
