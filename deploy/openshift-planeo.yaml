@@ -184,6 +184,11 @@ spec:
     spec:
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       automountServiceAccountToken: false
+      volumes:
+        - name: smtp-ca
+          secret:
+            secretName: planeo-smtp-ca
+            optional: true
       containers:
         - name: email
           image: image-registry.openshift-image-registry.svc:5000/planeo/planeo:release-placeholder
@@ -192,6 +197,8 @@ spec:
             allowPrivilegeEscalation: false
             seccompProfile: {type: RuntimeDefault}
             capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: smtp-ca, mountPath: /etc/planeo/smtp-ca, readOnly: true}
           env:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: DATABASE_URL}}}
             - {name: EMAIL_PROVIDER_URL, valueFrom: {secretKeyRef: {name: planeo-runtime, key: EMAIL_PROVIDER_URL, optional: true}}}
@@ -201,6 +208,8 @@ spec:
             - {name: SMTP_SECURE, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_SECURE, optional: true}}}
             - {name: SMTP_REQUIRE_TLS, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_REQUIRE_TLS, optional: true}}}
             - {name: SMTP_TLS_REJECT_UNAUTHORIZED, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_TLS_REJECT_UNAUTHORIZED, optional: true}}}
+            - {name: SMTP_TLS_CERT_FINGERPRINTS, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_TLS_CERT_FINGERPRINTS, optional: true}}}
+            - {name: NODE_EXTRA_CA_CERTS, value: /etc/planeo/smtp-ca/ca.crt}
             - {name: SMTP_USERNAME, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_USERNAME, optional: true}}}
             - {name: SMTP_PASSWORD, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_PASSWORD, optional: true}}}
           command: [node, ops/email-worker.mjs]

@@ -25,14 +25,17 @@ describe("email provider selection", () => {
     expect(close).toHaveBeenCalled();
   });
 
-  it("retains STARTTLS encryption for a trusted relay with a self-signed certificate", () => {
+  it("pins an explicitly trusted internal relay certificate", () => {
     const createTransport = vi.fn(() => ({ sendMail: vi.fn(), close: vi.fn() }));
     createEmailProvider({
       SMTP_HOST: "smtp.internal",
       SMTP_FROM: "no-reply@example.test",
-      SMTP_TLS_REJECT_UNAUTHORIZED: "false",
+      SMTP_TLS_CERT_FINGERPRINTS: "AA:BB, ccdd",
     }, { createTransport });
-    expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({ tls: { rejectUnauthorized: false } }));
+    const options = createTransport.mock.calls[0]?.[0];
+    expect(options?.tls.rejectUnauthorized).toBe(true);
+    expect(options?.tls.checkServerIdentity("smtp.internal", { fingerprint256: "AA:BB" })).toBeUndefined();
+    expect(options?.tls.checkServerIdentity("smtp.internal", { fingerprint256: "CC:DD" })).toBeUndefined();
   });
 
   it("requires a sender and complete optional authentication", () => {
