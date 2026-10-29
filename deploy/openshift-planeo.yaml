@@ -200,6 +200,7 @@ spec:
             - {name: SMTP_FROM, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_FROM, optional: true}}}
             - {name: SMTP_SECURE, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_SECURE, optional: true}}}
             - {name: SMTP_REQUIRE_TLS, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_REQUIRE_TLS, optional: true}}}
+            - {name: SMTP_TLS_REJECT_UNAUTHORIZED, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_TLS_REJECT_UNAUTHORIZED, optional: true}}}
             - {name: SMTP_USERNAME, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_USERNAME, optional: true}}}
             - {name: SMTP_PASSWORD, valueFrom: {secretKeyRef: {name: planeo-runtime, key: SMTP_PASSWORD, optional: true}}}
           command: [node, ops/email-worker.mjs]
@@ -376,6 +377,10 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

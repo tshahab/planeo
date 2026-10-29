@@ -18,6 +18,7 @@ export function createEmailProvider(env = process.env, dependencies = {}) {
       port,
       secure: boolean(env.SMTP_SECURE, port === 465),
       requireTLS: boolean(env.SMTP_REQUIRE_TLS),
+      tls: { rejectUnauthorized: boolean(env.SMTP_TLS_REJECT_UNAUTHORIZED, true) },
       auth: username ? { user: username, pass: password } : undefined,
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,

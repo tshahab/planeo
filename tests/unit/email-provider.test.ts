@@ -19,10 +19,20 @@ describe("email provider selection", () => {
     const provider = createEmailProvider({ SMTP_HOST: "smtp.internal", SMTP_PORT: "25", SMTP_FROM: "no-reply@example.test" }, { createTransport });
     expect(provider.kind).toBe("smtp");
     await provider.send(item);
-    expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({ host: "smtp.internal", port: 25, secure: false }));
+    expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({ host: "smtp.internal", port: 25, secure: false, tls: { rejectUnauthorized: true } }));
     expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ from: "no-reply@example.test", to: item.recipient, subject: item.subject }));
     provider.close();
     expect(close).toHaveBeenCalled();
+  });
+
+  it("retains STARTTLS encryption for a trusted relay with a self-signed certificate", () => {
+    const createTransport = vi.fn(() => ({ sendMail: vi.fn(), close: vi.fn() }));
+    createEmailProvider({
+      SMTP_HOST: "smtp.internal",
+      SMTP_FROM: "no-reply@example.test",
+      SMTP_TLS_REJECT_UNAUTHORIZED: "false",
+    }, { createTransport });
+    expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({ tls: { rejectUnauthorized: false } }));
   });
 
   it("requires a sender and complete optional authentication", () => {
