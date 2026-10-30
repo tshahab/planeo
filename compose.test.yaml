@@ -124,17 +124,18 @@ services:
   test-app:
     build:
       context: .
-      target: development
+      target: builder
     environment:
       DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
       SESSION_SECRET: docker-test-secret-with-at-least-thirty-two-characters
       APP_URL: http://test-app:3000
+      PUBLIC_SIGNUP_ENABLED: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       IDENTITY_RATE_LIMIT: "30"
     depends_on:
       test-database:
         condition: service_healthy
-    command: ["sh", "-c", "pnpm db:deploy && pnpm dev --hostname 0.0.0.0"]
+    command: ["sh", "-c", "pnpm db:deploy && PUBLIC_SIGNUP_ENABLED=true pnpm build && pnpm start"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/login').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))"]
