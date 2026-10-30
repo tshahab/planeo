@@ -401,17 +401,46 @@ spec:
           port: 5353
     - to:
         - ipBlock:
+            cidr: 10.50.12.173/32
+      ports:
+        - protocol: TCP
+          port: 25
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: planeo-webhook-https-egress
+  namespace: planeo
+spec:
+  podSelector:
+    matchLabels: {app: planeo-worker, worker: webhook}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
             cidr: 0.0.0.0/0
             except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8, 100.64.0.0/10, 177.30.0.0/16, 198.18.0.0/15]
       ports:
         - protocol: TCP
           port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: planeo-chat-https-egress
+  namespace: planeo
+spec:
+  podSelector:
+    matchLabels: {app: planeo-worker, worker: chat}
+  policyTypes: [Egress]
+  egress:
     - to:
         - ipBlock:
-            cidr: 10.50.12.173/32
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8, 100.64.0.0/10, 177.30.0.0/16, 198.18.0.0/15]
       ports:
         - protocol: TCP
-          port: 25
+          port: 443
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
