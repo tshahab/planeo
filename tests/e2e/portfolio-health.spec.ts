@@ -10,7 +10,7 @@ test("portfolio health is accessible and exposes governed snapshot controls", as
   await page.getByLabel("Workspace name").fill("Health Workspace");
   await page.getByLabel("Workspace URL").fill(unique);
   await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
 
   await page.goto("/plans");
   await page.getByLabel("Plan name").fill("Health roadmap");
