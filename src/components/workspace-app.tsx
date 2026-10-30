@@ -32,6 +32,8 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [customFields, setCustomFields] = useState<Array<{ required: boolean; issueTypeIds: unknown; field: { id: string; name: string; type: string; options: unknown; defaultValue: unknown } }>>([]);
   const createTrigger = useRef<HTMLElement | null>(null);
+  const issueTrigger = useRef<HTMLElement | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
 
   function openCreate() {
     createTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -41,6 +43,11 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
   function closeCreate() {
     setCreating(false);
     requestAnimationFrame(() => createTrigger.current?.focus());
+  }
+
+  function openIssue(issue: Issue) {
+    issueTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelectedIssue(issue);
   }
 
   useEffect(() => { const controller = new AbortController(); fetch("/api/notifications?page=1", { signal: controller.signal }).then((response) => response.ok ? response.json() : { unread: 0 }).then((result: { unread: number }) => setUnreadNotifications(result.unread)).catch(() => undefined); return () => controller.abort(); }, []);
@@ -69,6 +76,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
     setSelectedIssue(null);
     const returnTo = searchParams.get("returnTo");
     if (returnTo === "/" || returnTo === "/notifications" || returnTo?.startsWith("/search")) router.push(returnTo);
+    requestAnimationFrame(() => (issueTrigger.current ?? mainRef.current)?.focus());
   }
 
   const visibleIssues = useMemo(() => issues.filter((issue) => {
@@ -155,7 +163,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
       </aside>
       {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
 
-      <main className="main-content">
+      <main ref={mainRef} className="main-content" tabIndex={-1}>
         <header className="topbar">
           <button className="menu-button" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><span>Projects</span><span>/</span><strong>{project.name}</strong></div>
@@ -179,9 +187,9 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
           {project.template === "SCRUM" && activeSprint && <div className="sprint-chip"><Sparkles size={14} /><span>{activeSprint.name}</span>{activeSprint.endsAt && <strong>Ends {new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(activeSprint.endsAt))}</strong>}</div>}
         </section>
 
-        <Board issues={visibleIssues} statuses={statuses} onSelect={setSelectedIssue} onMove={moveIssue} onCreate={openCreate} readOnly={!canWriteProject} /></>}
+        <Board issues={visibleIssues} statuses={statuses} onSelect={openIssue} onMove={moveIssue} onCreate={openCreate} readOnly={!canWriteProject} /></>}
         {view === "summary" && <ProjectSummaryView projectKey={project.key} />}
-        {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={setSelectedIssue} />}
+        {view === "backlog" && <Backlog projectKey={project.key} canWrite={canWriteProject} onSelect={openIssue} />}
       </main>
 
       {selectedIssue && <IssuePanel issue={selectedIssue} statuses={statuses} currentUser={currentUser} onClose={closeIssue} onMove={(status) => moveIssue(selectedIssue.id, status)} onUpdate={(changes) => updateIssue(selectedIssue.id, changes)} onArchive={canManageProject ? async () => { const response = await fetch(`/api/issues/${selectedIssue.id}/archive`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "archive" }) }); if (!response.ok) throw new Error("Issue could not be archived."); setIssues((current) => current.filter((item) => item.id !== selectedIssue.id)); setSelectedIssue(null); } : undefined} onDelete={canManageProject ? async () => { const response = await fetch(`/api/issues/${selectedIssue.id}`, { method: "DELETE" }); const result = await response.json() as { error?: string }; if (!response.ok) throw new Error(result.error ?? "Issue could not be deleted."); setIssues((current) => current.filter((item) => item.id !== selectedIssue.id)); setSelectedIssue(null); } : undefined} readOnly={!canWriteProject} />}
