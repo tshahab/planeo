@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import type { Issue } from "@/lib/types";
 
 type Filters = { projects: Array<{ id: string; key: string; name: string; statuses: Array<{ id: string; name: string }>; issueTypes: Array<{ id: string; name: string }> }>; members: Array<{ id: string; name: string }>; labels: Array<{ id: string; name: string }>; sprints: Array<{ id: string; name: string; projectId: string }>; releases: Array<{ id: string; name: string; projectId: string; archivedAt?: string }> };
-type Payload = { results: Array<Issue & { projectName: string }>; goals: Array<{ id: string; name: string; status: string; visibility: string; resourceUrl: string }>; total: number; page: number; pageSize: number; filters: Filters; error?: string; offset?: number };
+type Payload = { results: Array<Issue & { projectKey: string; projectName: string }>; goals: Array<{ id: string; name: string; status: string; visibility: string; resourceUrl: string }>; total: number; page: number; pageSize: number; filters: Filters; error?: string; offset?: number };
 type SavedFilter = { id: string; name: string; query: Record<string, string>; shared: boolean; ownerId: string; owner: { name: string } };
 
 export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceName: string; currentUserId: string }) {
@@ -23,7 +23,17 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
   const [selected, setSelected] = useState<Record<string, number>>({});
   const [bulkPriority, setBulkPriority] = useState("HIGH");
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [queryText, setQueryText] = useState("");
+  const [advancedText, setAdvancedText] = useState("");
   const queryString = searchParams.toString();
+
+  /* eslint-disable react-hooks/set-state-in-effect -- synchronize controlled search fields after URL navigation */
+  useEffect(() => {
+    setQueryText(searchParams.get("q") ?? "");
+    setAdvancedText(searchParams.get("query") ?? "");
+    setSelected({});
+  }, [queryString]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     const controller = new AbortController();
@@ -63,8 +73,8 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
     <section className="search-content">
       <div className="search-title"><div><span>Workspace</span><h1>Search issues</h1><p>Find permitted work across projects using structured filters.</p></div><SlidersHorizontal aria-hidden="true" /></div>
       <section className="saved-filter-panel" aria-label="Saved filters"><div className="saved-filter-create"><Bookmark /><input aria-label="Saved filter name" value={saveName} maxLength={80} placeholder="Name this search" onChange={(event) => setSaveName(event.target.value)} /><label><input type="checkbox" checked={shareNew} onChange={(event) => setShareNew(event.target.checked)} /> Share with workspace</label><button disabled={!saveName.trim()} onClick={() => void saveFilter()}>Save filter</button></div>{savedFilters.length > 0 && <div className="saved-filter-list">{savedFilters.map((filter) => <div key={filter.id}><button className="saved-filter-name" onClick={() => applyFilter(filter)}><Bookmark />{filter.name}<small>{filter.shared ? `Shared by ${filter.owner.name}` : "Private"}</small></button>{filter.ownerId === currentUserId && <><button aria-label={`${filter.shared ? "Unshare" : "Share"} ${filter.name}`} onClick={() => void changeFilter(filter, { shared: !filter.shared })}><Share2 /></button><button aria-label={`Rename ${filter.name}`} onClick={() => { const name = window.prompt("Rename saved filter", filter.name); if (name?.trim()) void changeFilter(filter, { name: name.trim() }); }}>Rename</button><button aria-label={`Delete ${filter.name}`} onClick={() => void deleteFilter(filter)}><Trash2 /></button></>}</div>)}</div>}</section>
-      <div className="workspace-search-input"><Search aria-hidden="true" /><input aria-label="Search issue key, summary, or description" defaultValue={searchParams.get("q") ?? ""} placeholder="Try WEB-12 or onboarding" onKeyDown={(event) => { if (event.key === "Enter") update("q", event.currentTarget.value.trim()); }} /><button onClick={(event) => update("q", event.currentTarget.parentElement?.querySelector("input")?.value.trim() ?? "")}>Search</button></div>
-      <label className="advanced-query-input">Advanced query<textarea aria-describedby="advanced-query-help" defaultValue={searchParams.get("query") ?? ""} placeholder={'project = WEB AND priority IN (URGENT, HIGH)'} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") update("query", event.currentTarget.value.trim()); }} /><small id="advanced-query-help">Use fields, comparisons, AND/OR/NOT, and parentheses. Press Ctrl+Enter or ⌘+Enter to run.</small><button onClick={(event) => update("query", event.currentTarget.parentElement?.querySelector("textarea")?.value.trim() ?? "")}>Run query</button></label>
+      <div className="workspace-search-input"><Search aria-hidden="true" /><input aria-label="Search issue key, summary, or description" value={queryText} onChange={(event) => setQueryText(event.target.value)} placeholder="Try WEB-12 or onboarding" onKeyDown={(event) => { if (event.key === "Enter") update("q", queryText.trim()); }} /><button onClick={() => update("q", queryText.trim())}>Search</button></div>
+      <label className="advanced-query-input">Advanced query<textarea aria-describedby="advanced-query-help" value={advancedText} onChange={(event) => setAdvancedText(event.target.value)} placeholder={'project = WEB AND priority IN (URGENT, HIGH)'} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") update("query", advancedText.trim()); }} /><small id="advanced-query-help">Use fields, comparisons, AND/OR/NOT, and parentheses. Press Ctrl+Enter or ⌘+Enter to run.</small><button onClick={() => update("query", advancedText.trim())}>Run query</button></label>
       <div className="search-filters" aria-label="Search filters">
         <Filter label="Project" value={searchParams.get("project") ?? ""} onChange={(value) => update("project", value)} options={data?.filters.projects.map((item) => [item.key, item.name]) ?? []} />
         <Filter label="Type" value={searchParams.get("type") ?? ""} onChange={(value) => update("type", value)} options={namedOptions(issueTypes.map((item) => [String(item.id), String(item.name), "projectName" in item ? String(item.projectName) : ""]))} />
@@ -84,7 +94,7 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
       {loading && <div className="search-state" role="status">Loading search results…</div>}
       {error && <div className="search-state search-state-error" role="alert">{error}</div>}
       {!loading && !error && data?.results.length === 0 && <div className="search-state">No issues match these filters.</div>}
-      {!loading && !error && <div className="search-result-list">{data?.results.map((issue) => <div key={issue.id}><input aria-label={`Select ${issue.key}`} type="checkbox" checked={selected[issue.id] !== undefined} onChange={event => setSelected(current => { const next = { ...current }; if (event.target.checked) next[issue.id] = issue.version ?? 0; else delete next[issue.id]; return next; })}/><Link href={`/projects/${issue.key.split("-")[0]}?issue=${issue.id}&returnTo=${encodeURIComponent(`${pathname}?${queryString}`)}`}><strong>{issue.key}</strong><span>{issue.title}<small>{issue.projectName} · {issue.status} · {issue.priority}</small></span><em>{issue.assignee?.name ?? "Unassigned"}</em></Link></div>)}</div>}
+      {!loading && !error && <div className="search-result-list">{data?.results.map((issue) => <div className={selected[issue.id] !== undefined ? "selected" : undefined} key={issue.id}><input aria-label={`Select ${issue.key}`} type="checkbox" checked={selected[issue.id] !== undefined} onChange={event => setSelected(current => { const next = { ...current }; if (event.target.checked) next[issue.id] = issue.version ?? 0; else delete next[issue.id]; return next; })}/><Link href={`/projects/${issue.projectKey}?issue=${issue.id}&returnTo=${encodeURIComponent(`${pathname}?${queryString}`)}`}><strong>{issue.key}</strong><span>{issue.title}<small>{issue.projectName} · {issue.status} · {issue.priority}</small></span><em>{issue.assignee?.name ?? "Unassigned"}</em></Link></div>)}</div>}
       {!loading && !error && data?.goals?.length ? <section className="search-goals"><h2>Goals</h2>{data.goals.map(goal => <Link key={goal.id} href={goal.resourceUrl}><strong>{goal.name}</strong><small>{goal.status.replaceAll("_", " ")} · {goal.visibility.toLowerCase()}</small></Link>)}</section> : null}
       {!loading && !error && data && data.total > data.pageSize && <nav className="search-pagination" aria-label="Search result pages"><button disabled={page <= 1} onClick={() => update("page", String(page - 1))}>Previous</button><span>Page {page} of {pages}</span><button disabled={page >= pages} onClick={() => update("page", String(page + 1))}>Next</button></nav>}
     </section>
