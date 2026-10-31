@@ -8,6 +8,8 @@ const SESSION_SECONDS = 7 * 24 * 60 * 60;
 type PortalClaims = { sessionId: string; customerId: string; workspaceId: string; expiresAt: number };
 export type PortalContext = { customer: { id: string; email: string; name: string; locale: string; emailNotifications: boolean; issueReporterUserId: string }; workspace: { id: string; slug: string; name: string }; organizationProjects?: { organizationId: string; projectId: string }[] };
 
+function securePortalCookie() { return process.env.SESSION_COOKIE_SECURE === "true" || (process.env.SESSION_COOKIE_SECURE !== "false" && process.env.NODE_ENV === "production"); }
+
 function secret() { const value = process.env.SESSION_SECRET; if (!value || value.length < 32) throw new Error("SESSION_SECRET must contain at least 32 characters"); return value; }
 function sign(value: string) { return createHmac("sha256", secret()).update(`portal:${value}`).digest("base64url"); }
 function tokenHash(value: string) { return createHash("sha256").update(value).digest("hex"); }
@@ -16,12 +18,12 @@ export async function createPortalSession(customerId: string, workspaceId: strin
   const expiresAt = Date.now() + SESSION_SECONDS * 1000;
   const session = await db.portalCustomerSession.create({ data: { customerId, workspaceId, expiresAt: new Date(expiresAt) } });
   const claims: PortalClaims = { sessionId: session.id, customerId, workspaceId, expiresAt }; const encoded = Buffer.from(JSON.stringify(claims)).toString("base64url");
-  (await cookies()).set(COOKIE_NAME, `${encoded}.${sign(encoded)}`, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: SESSION_SECONDS, path: "/" });
+  (await cookies()).set(COOKIE_NAME, `${encoded}.${sign(encoded)}`, { httpOnly: true, secure: securePortalCookie(), sameSite: "lax", maxAge: SESSION_SECONDS, path: "/" });
 }
 
 export async function clearPortalSession() {
   const claims = await readClaims(); if (claims) await db.portalCustomerSession.updateMany({ where: { id: claims.sessionId, customerId: claims.customerId }, data: { revokedAt: new Date() } });
-  (await cookies()).set(COOKIE_NAME, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 0, path: "/" });
+  (await cookies()).set(COOKIE_NAME, "", { httpOnly: true, secure: securePortalCookie(), sameSite: "lax", maxAge: 0, path: "/" });
 }
 
 async function readClaims(): Promise<PortalClaims | null> {

@@ -6,6 +6,10 @@ import { effectiveSessionLifetimeSeconds } from "./enterprise-organization";
 
 const COOKIE_NAME = "planeo_session";
 
+function secureSessionCookie() {
+  return process.env.SESSION_COOKIE_SECURE === "true" || (process.env.SESSION_COOKIE_SECURE !== "false" && process.env.NODE_ENV === "production");
+}
+
 interface SessionClaims {
   sessionId: string;
   userId: string;
@@ -53,7 +57,7 @@ export async function createSession(userId: string, workspaceId: string) {
   const value = `${encoded}.${sign(encoded)}`;
   (await cookies()).set(COOKIE_NAME, value, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: secureSessionCookie(),
     sameSite: "lax",
     maxAge: sessionSeconds,
     path: "/",
@@ -63,7 +67,7 @@ export async function createSession(userId: string, workspaceId: string) {
 export async function clearSession() {
   const claims = await readClaims();
   if (claims?.sessionId) await db.session.updateMany({ where: { id: claims.sessionId, userId: claims.userId }, data: { revokedAt: new Date() } });
-  (await cookies()).set(COOKIE_NAME, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 0, path: "/" });
+  (await cookies()).set(COOKIE_NAME, "", { httpOnly: true, secure: secureSessionCookie(), sameSite: "lax", maxAge: 0, path: "/" });
 }
 
 async function readClaims(): Promise<SessionClaims | null> {

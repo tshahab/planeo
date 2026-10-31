@@ -128,8 +128,10 @@ services:
     environment:
       DATABASE_URL: postgresql://planeo_test:planeo_test@test-database:5432/planeo_test
       SESSION_SECRET: docker-test-secret-with-at-least-thirty-two-characters
+      WEBHOOK_ENCRYPTION_SECRET: docker-test-webhook-encryption-secret-32-chars
       APP_URL: http://test-app:3000
       PUBLIC_SIGNUP_ENABLED: "true"
+      SESSION_COOKIE_SECURE: "false"
       NEXT_TELEMETRY_DISABLED: "1"
       IDENTITY_RATE_LIMIT: "30"
     depends_on:
