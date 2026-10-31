@@ -32,6 +32,7 @@ export function WorkspaceSearch({ workspaceName, currentUserId }: { workspaceNam
     setQueryText(searchParams.get("q") ?? "");
     setAdvancedText(searchParams.get("query") ?? "");
     setSelected({});
+    setBulkStatus(null);
   }, [queryString]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
