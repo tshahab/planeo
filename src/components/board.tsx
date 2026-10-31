@@ -10,7 +10,7 @@ const priorityIcon: Record<Priority, React.ReactNode> = {
 
 export function Board({ issues, statuses, onSelect, onMove, onCreate, readOnly = false }: { issues: Issue[]; statuses: ProjectStatus[]; onSelect: (issue: Issue) => void; onMove: (id: string, status: Status) => void; onCreate: () => void; readOnly?: boolean }) {
   return (
-    <div className="board" aria-label="Project board">
+    <div className="board" aria-label="Project board"><p className="board-help">Drag cards between columns, or focus a card and use Alt + Left/Right to move it.</p>
       {statuses.map((column) => {
         const columnIssues = issues.filter((issue) => issue.status === column.name);
         const points = columnIssues.reduce((sum, issue) => sum + (issue.points ?? 0), 0);
