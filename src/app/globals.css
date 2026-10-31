@@ -155,3 +155,15 @@ html[data-theme="dark"] :where(.tabs button.active,.tabs a[aria-selected="true"]
 html[data-theme="dark"] :where(.issue-card h3,.issue-link,.issue-link em,.panel-key strong,.date-property input){color:var(--ink)!important}
 html[data-theme="dark"] :where(.empty-column,.empty-backlog){color:var(--muted)!important;border-color:var(--line)!important}
 .app-shell :focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+html[data-theme="dark"] :where(.admin-page,.settings-page){background:var(--canvas)!important;color:var(--ink)!important}
+html[data-theme="dark"] :where(.admin-content>section,.admin-list>div){background:var(--surface)!important;color:var(--ink)!important;border-color:var(--line)!important}
+html[data-theme="dark"] :where(.admin-content h1,.admin-content h2,.admin-content h3,.admin-content strong){color:var(--ink)!important}
+html[data-theme="dark"] :where(.admin-content p,.admin-content small,.admin-content label,.admin-list small){color:var(--muted)!important}
+html[data-theme="dark"] :where(.admin-content input,.admin-content select,.admin-content textarea,.admin-content button,.settings-page input,.settings-page select,.settings-page textarea){background:var(--surface)!important;color:var(--ink)!important;border-color:var(--line)!important}
+html[data-theme="dark"] :where(.admin-content button:not(.danger),.settings-page form>button){background:var(--primary-dark)!important;color:#fff!important;border-color:var(--primary-dark)!important}
+html[data-theme="dark"] :where(.admin-content .danger){background:#5a252d!important;color:#ffd9dd!important;border-color:#a94f5b!important}
+html[data-theme="dark"] :where(.settings-grid>form,.session-card){background:var(--surface)!important;color:var(--ink)!important;border-color:var(--line)!important}
+html[data-theme="dark"] :where(.settings-grid h1,.settings-grid h2,.settings-grid strong,.settings-grid label,.settings-grid legend){color:var(--ink)!important}
+html[data-theme="dark"] :where(.settings-grid p,.settings-grid span,.settings-grid small){color:var(--muted)!important}
+html[data-theme="dark"] :where(.settings-grid input,.settings-grid select,.settings-grid textarea,.settings-grid fieldset){background:var(--surface)!important;color:var(--ink)!important;border-color:var(--line)!important}
+html[data-theme="dark"] :where(.settings-grid form>button){background:var(--primary-dark)!important;color:#fff!important;border-color:var(--primary-dark)!important}
