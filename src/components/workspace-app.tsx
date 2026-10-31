@@ -113,7 +113,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
     setSelectedIssue((current) => current?.id === id ? result.issue! : current);
   }
 
-  async function addIssue(draft: Issue) {
+  async function addIssue(draft: Issue, attachment?: File) {
     setSyncError(null);
     try {
       const response = await fetch("/api/issues", {
@@ -123,6 +123,12 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
       });
       const result = await response.json() as { issue?: Issue; error?: string };
       if (!response.ok || !result.issue) throw new Error(result.error ?? "The issue could not be created.");
+      if (attachment) {
+        const form = new FormData();
+        form.set("file", attachment);
+        const upload = await fetch(`/api/issues/${result.issue.id}/attachments`, { method: "POST", body: form });
+        if (!upload.ok) throw new Error("Issue created, but the attachment could not be uploaded.");
+      }
       setIssues((current) => [result.issue!, ...current]);
       closeCreate();
     } catch (error) {
