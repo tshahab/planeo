@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     db.serviceRequestType.findMany({ where: { archivedAt: null, project: accessibleProjectWhere(context) }, orderBy: { name: "asc" }, select: { id: true, name: true, projectId: true } }),
     db.goal.findMany({ where: { ...goalWhere(context), ...(query ? { AND: [{ OR: [{ name: { contains: query, mode: "insensitive" } }, { description: { contains: query, mode: "insensitive" } }] }] } : {}) }, select: { id: true, name: true, status: true, visibility: true, periodEnd: true }, orderBy: { updatedAt: "desc" }, take: 25 }),
   ]);
-  const results = records.map((record) => ({ ...toUiIssue(record, record.project.key), projectName: record.project.name }));
+  const results = records.map((record) => ({ ...toUiIssue(record, record.project.key), projectKey: record.project.key, projectName: record.project.name }));
   if (exactKey) results.sort((a, b) => Number(b.key.toUpperCase() === query.toUpperCase()) - Number(a.key.toUpperCase() === query.toUpperCase()));
   return NextResponse.json({ results, goals: goals.map(goal => ({ ...goal, resourceUrl: `/goals?goal=${goal.id}` })), total, page, pageSize: PAGE_SIZE, query: { version: QUERY_LANGUAGE_VERSION, cost: queryCost, fields: QUERY_FIELDS }, filters: { projects, members: members.map(({ user }) => user), labels, sprints, releases, requestTypes } });
 }
