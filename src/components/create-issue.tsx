@@ -6,7 +6,7 @@ import type { Issue, Person, Priority, ProjectIssueType, ProjectStatus, ProjectS
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 
 type CustomConfiguration = { required: boolean; issueTypeIds: unknown; field: { id: string; name: string; type: string; options: unknown; defaultValue: unknown } };
-export function CreateIssue({ project, people, issueTypes, statuses, customFields, nextNumber, onClose, onCreate }: { project: ProjectSummary; people: Person[]; issueTypes: ProjectIssueType[]; statuses: ProjectStatus[]; customFields: CustomConfiguration[]; nextNumber: number; onClose: () => void; onCreate: (issue: Issue) => void }) {
+export function CreateIssue({ project, people, issueTypes, statuses, customFields, nextNumber, onClose, onCreate }: { project: ProjectSummary; people: Person[]; issueTypes: ProjectIssueType[]; statuses: ProjectStatus[]; customFields: CustomConfiguration[]; nextNumber: number; onClose: () => void; onCreate: (issue: Issue, attachment?: File) => void }) {
   const dialogRef = useRef<HTMLFormElement>(null);
   useDialogFocus(dialogRef, onClose);
   const [title, setTitle] = useState("");
@@ -15,12 +15,13 @@ export function CreateIssue({ project, people, issueTypes, statuses, customField
   const [assignee, setAssignee] = useState(people[0]?.id ?? "");
   const [issueTypeId, setIssueTypeId] = useState(issueTypes[0]?.id ?? "");
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>(() => Object.fromEntries(customFields.filter(({ field }) => field.defaultValue != null).map(({ field }) => [field.id, field.defaultValue])));
+  const [attachment, setAttachment] = useState<File | undefined>();
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!title.trim()) return;
     const issueType = issueTypes.find((item) => item.id === issueTypeId) ?? issueTypes[0];
-    onCreate({ id: crypto.randomUUID(), issueTypeId: issueType?.id, key: `${project.key}-${nextNumber}`, title: title.trim(), description: description.trim() || "No description yet.", status: statuses[0]?.name ?? "Backlog", priority, type: issueType?.name ?? "Task", assignee: people.find((person) => person.id === assignee), labels: [], comments: 0, attachments: 0, customFields: Object.fromEntries(applicableFields(customFields, issueTypeId).filter(({ field }) => fieldValues[field.id] !== undefined && fieldValues[field.id] !== "").map(({ field }) => [field.id, { name: field.name, type: field.type, options: Array.isArray(field.options) ? field.options as string[] : [], archived: false, value: fieldValues[field.id] }])), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    onCreate({ id: crypto.randomUUID(), issueTypeId: issueType?.id, key: `${project.key}-${nextNumber}`, title: title.trim(), description: description.trim() || "No description yet.", status: statuses[0]?.name ?? "Backlog", priority, type: issueType?.name ?? "Task", assignee: people.find((person) => person.id === assignee), labels: [], comments: 0, attachments: 0, customFields: Object.fromEntries(applicableFields(customFields, issueTypeId).filter(({ field }) => fieldValues[field.id] !== undefined && fieldValues[field.id] !== "").map(({ field }) => [field.id, { name: field.name, type: field.type, options: Array.isArray(field.options) ? field.options as string[] : [], archived: false, value: fieldValues[field.id] }])), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, attachment);
   }
 
   return <div className="modal-layer">
@@ -36,7 +37,7 @@ export function CreateIssue({ project, people, issueTypes, statuses, customField
           <label><span>Assignee</span><select value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="">Unassigned</option>{people.map((person) => <option value={person.id} key={person.id}>{person.name}</option>)}</select></label>
         </div>
         <div className="field-grid">{applicableFields(customFields, issueTypeId).map(({ field, required }) => <label key={field.id}><span>{field.name}{required ? " *" : ""}</span>{field.type === "BOOLEAN" ? <input type="checkbox" checked={fieldValues[field.id] === true} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: event.target.checked }))} /> : field.type === "SINGLE_SELECT" ? <select value={String(fieldValues[field.id] ?? "")} required={required} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Select…</option>{(Array.isArray(field.options) ? field.options : []).map((option) => <option key={String(option)}>{String(option)}</option>)}</select> : <input type={field.type === "NUMBER" ? "number" : field.type === "DATE" ? "date" : field.type === "URL" ? "url" : "text"} required={required} value={String(fieldValues[field.id] ?? "")} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: field.type === "NUMBER" ? Number(event.target.value) : event.target.value }))} />}</label>)}</div>
-        <button className="attach-button" type="button"><Paperclip size={16} /> Attach files</button>
+        <label className="attach-button" htmlFor="create-issue-attachment"><Paperclip size={16} /> {attachment ? attachment.name : "Attach files"}<input id="create-issue-attachment" type="file" accept="image/*,.pdf,.zip,.json,.txt,.csv" onChange={(event) => setAttachment(event.target.files?.[0])} /></label>
       </div>
       <footer><span><kbd>⌘</kbd> + <kbd>Enter</kbd> to create</span><div><button type="button" className="cancel-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={!title.trim() || !issueTypeId}>Create issue</button></div></footer>
     </form>
