@@ -151,7 +151,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
 
         <nav aria-label="Main navigation">
           <Link href="/" className="nav-item"><LayoutDashboard /> Home</Link>
-          <a href="#" className="nav-item"><Inbox /> Your work <span className="nav-count">5</span></a>
+          <Link href="/search" className="nav-item"><Inbox /> Your work <span className="nav-count">5</span></Link>
           <Link href="/search" className="nav-item"><Search /> Search</Link>
           <Link href="/notifications" className="nav-item"><Bell /> Notifications {unreadNotifications > 0 && <span className="nav-count">{unreadNotifications}</span>}</Link>
         </nav>
@@ -163,7 +163,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
 
         <div className="sidebar-footer">
           {canManageProjects && <><Link href="/settings/workspace" className="nav-item"><Users /> Workspace admin</Link><Link href="/settings/audit" className="nav-item"><ListFilter /> Audit log</Link></>}
-          <a href="#" className="nav-item"><CircleHelp /> Help & feedback</a>
+          <a href="mailto:support@teknosys.ai" className="nav-item"><CircleHelp /> Help & feedback</a>
           <Link href="/settings/profile" className="nav-item"><Settings /> Settings</Link>
           <div className="user-card"><Avatar person={currentUser} /><div><strong>{currentUser.name}</strong><span>Signed in</span></div><button className="logout-button" aria-label="Sign out" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.replace("/login"); router.refresh(); }}><MoreHorizontal size={16} /></button></div>
         </div>
@@ -183,7 +183,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
             <div className="header-actions"><div className="avatar-stack">{projectPeople.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}{projectPeople.length > 4 && <span className="more-people">+{projectPeople.length - 4}</span>}</div>{canManageProject && <><button className="secondary-button" onClick={() => setManagingMembers(true)}><Users size={16} /> Members</button><Link className="secondary-button" href={`/projects/${project.key}/settings/workflow`}><Settings size={16} /> Workflow</Link></>}{canWriteProject && <button className="primary-button" onClick={openCreate}><Plus size={17} /> Create</button>}</div>
           </div>
           {project.template === "SERVICE" && canWriteProject && <Link href={`/projects/${project.key}/queues`}>Agent queues</Link>}
-          <div className="tabs" role="tablist"><button role="tab" aria-selected={view === "summary"} className={view === "summary" ? "active" : ""} onClick={() => setView("summary")}>Summary</button><button role="tab" aria-selected={view === "board"} className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button role="tab" aria-selected={view === "backlog"} className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><Link role="tab" aria-selected={pathname === `/projects//reports`} className={pathname === `/projects//reports` ? "active" : ""} href={`/projects//reports`}>Reports</Link><Link role="tab" aria-selected={pathname === `/projects//releases`} className={pathname === `/projects//releases` ? "active" : ""} href={`/projects//releases`}>Releases</Link><Link role="tab" aria-selected={pathname === "/search" && searchParams.get("project") === project.key} className={pathname === "/search" && searchParams.get("project") === project.key ? "active" : ""} href={`/search?project=${project.key}`}>Issues</Link></div>
+          <div className="tabs" role="tablist"><button role="tab" aria-selected={view === "summary"} className={view === "summary" ? "active" : ""} onClick={() => setView("summary")}>Summary</button><button role="tab" aria-selected={view === "board"} className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button role="tab" aria-selected={view === "backlog"} className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><Link role="tab" aria-selected={pathname === `/projects/${project.key}/reports`} className={pathname === `/projects/${project.key}/reports` ? "active" : ""} href={`/projects/${project.key}/reports`}>Reports</Link><Link role="tab" aria-selected={pathname === `/projects/${project.key}/releases`} className={pathname === `/projects/${project.key}/releases` ? "active" : ""} href={`/projects/${project.key}/releases`}>Releases</Link><Link role="tab" aria-selected={pathname === "/search" && searchParams.get("project") === project.key} className={pathname === "/search" && searchParams.get("project") === project.key ? "active" : ""} href={`/search?project=${project.key}`}>Issues</Link></div>
         </section>
 
         {view === "board" && <><section className="board-toolbar">
