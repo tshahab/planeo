@@ -22,6 +22,12 @@ export async function consumeRateLimit(identifier: string, limit: number, window
 }
 
 export function requestClientKey(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",").map((value) => value.trim()).filter(Boolean).at(-1);
+  // OpenShift's router supplies X-Real-IP and appends the original client to
+  // X-Forwarded-For. Prefer the router's canonical value and only use the
+  // left-most forwarded address as a fallback; accepting the right-most value
+  // lets a caller spoof a fresh bucket on every request.
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",").map((value) => value.trim()).filter(Boolean)[0];
   return forwarded || "unknown";
 }
