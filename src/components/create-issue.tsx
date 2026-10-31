@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Paperclip, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Issue, Person, Priority, ProjectIssueType, ProjectStatus, ProjectSummary } from "@/lib/types";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 
@@ -16,6 +16,8 @@ export function CreateIssue({ project, people, issueTypes, statuses, customField
   const [issueTypeId, setIssueTypeId] = useState(issueTypes[0]?.id ?? "");
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>(() => Object.fromEntries(customFields.filter(({ field }) => field.defaultValue != null).map(({ field }) => [field.id, field.defaultValue])));
   const [attachment, setAttachment] = useState<File | undefined>();
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  useEffect(() => { const onKeyDown = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); dialogRef.current?.requestSubmit(); } }; window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown); }, []);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -37,7 +39,7 @@ export function CreateIssue({ project, people, issueTypes, statuses, customField
           <label><span>Assignee</span><select value={assignee} onChange={(event) => setAssignee(event.target.value)}><option value="">Unassigned</option>{people.map((person) => <option value={person.id} key={person.id}>{person.name}</option>)}</select></label>
         </div>
         <div className="field-grid">{applicableFields(customFields, issueTypeId).map(({ field, required }) => <label key={field.id}><span>{field.name}{required ? " *" : ""}</span>{field.type === "BOOLEAN" ? <input type="checkbox" checked={fieldValues[field.id] === true} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: event.target.checked }))} /> : field.type === "SINGLE_SELECT" ? <select value={String(fieldValues[field.id] ?? "")} required={required} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Select…</option>{(Array.isArray(field.options) ? field.options : []).map((option) => <option key={String(option)}>{String(option)}</option>)}</select> : <input type={field.type === "NUMBER" ? "number" : field.type === "DATE" ? "date" : field.type === "URL" ? "url" : "text"} required={required} value={String(fieldValues[field.id] ?? "")} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: field.type === "NUMBER" ? Number(event.target.value) : event.target.value }))} />}</label>)}</div>
-        <label className="attach-button" htmlFor="create-issue-attachment"><Paperclip size={16} /> {attachment ? attachment.name : "Attach files"}<input id="create-issue-attachment" type="file" accept="image/*,.pdf,.zip,.json,.txt,.csv" onChange={(event) => setAttachment(event.target.files?.[0])} /></label>
+        <div className="attachment-picker"><label className="attach-button" htmlFor="create-issue-attachment"><Paperclip size={16} /> {attachment ? attachment.name : "Attach files"}<input id="create-issue-attachment" type="file" accept="image/*,.pdf,.zip,.json,.txt,.csv" onChange={(event) => { const file = event.target.files?.[0]; setAttachmentError(null); if (file && file.size > 10 * 1024 * 1024) { setAttachment(undefined); setAttachmentError("Attachments must be 10 MB or smaller."); } else setAttachment(file); }} /></label>{attachment && <button type="button" className="attachment-remove" onClick={() => setAttachment(undefined)}>Remove</button>}{attachmentError && <small role="alert">{attachmentError}</small>}</div>
       </div>
       <footer><span><kbd>⌘</kbd> + <kbd>Enter</kbd> to create</span><div><button type="button" className="cancel-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={!title.trim() || !issueTypeId}>Create issue</button></div></footer>
     </form>
