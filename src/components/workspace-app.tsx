@@ -5,7 +5,7 @@ import {
   ListFilter, Menu, MoreHorizontal, Plus, Search, Settings, Sparkles, Users, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Board } from "./board";
 import { CreateIssue } from "./create-issue";
@@ -18,6 +18,7 @@ import type { Issue, Person, ProjectIssueType, ProjectStatus, ProjectSummary, St
 
 export function WorkspaceApp({ currentUser, workspaceName, project, projects, statuses, issueTypes, projectPeople, activeSprint, canManageProjects, canManageProject, canWriteProject }: { currentUser: Person; workspaceName: string; project: ProjectSummary; projects: ProjectSummary[]; statuses: ProjectStatus[]; issueTypes: ProjectIssueType[]; projectPeople: Person[]; activeSprint: { id: string; name: string; endsAt?: string } | null; canManageProjects: boolean; canManageProject: boolean; canWriteProject: boolean }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
@@ -182,7 +183,7 @@ export function WorkspaceApp({ currentUser, workspaceName, project, projects, st
             <div className="header-actions"><div className="avatar-stack">{projectPeople.slice(0, 4).map((person) => <Avatar key={person.id} person={person} />)}{projectPeople.length > 4 && <span className="more-people">+{projectPeople.length - 4}</span>}</div>{canManageProject && <><button className="secondary-button" onClick={() => setManagingMembers(true)}><Users size={16} /> Members</button><Link className="secondary-button" href={`/projects/${project.key}/settings/workflow`}><Settings size={16} /> Workflow</Link></>}{canWriteProject && <button className="primary-button" onClick={openCreate}><Plus size={17} /> Create</button>}</div>
           </div>
           {project.template === "SERVICE" && canWriteProject && <Link href={`/projects/${project.key}/queues`}>Agent queues</Link>}
-          <div className="tabs" role="tablist"><button role="tab" aria-selected={view === "summary"} className={view === "summary" ? "active" : ""} onClick={() => setView("summary")}>Summary</button><button role="tab" aria-selected={view === "board"} className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button role="tab" aria-selected={view === "backlog"} className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><Link role="tab" aria-selected={false} href={`/projects/${project.key}/reports`}>Reports</Link><Link role="tab" aria-selected={false} href={`/projects/${project.key}/releases`}>Releases</Link><button role="tab" aria-selected={false}>Issues</button></div>
+          <div className="tabs" role="tablist"><button role="tab" aria-selected={view === "summary"} className={view === "summary" ? "active" : ""} onClick={() => setView("summary")}>Summary</button><button role="tab" aria-selected={view === "board"} className={view === "board" ? "active" : ""} onClick={() => setView("board")}>Board</button><button role="tab" aria-selected={view === "backlog"} className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button><Link role="tab" aria-selected={false} href={`/projects/${project.key}/reports`}>Reports</Link><Link role="tab" aria-selected={false} href={`/projects/${project.key}/releases`}>Releases</Link><Link role="tab" aria-selected={pathname === "/search" && searchParams.get("project") === project.key} className={pathname === "/search" && searchParams.get("project") === project.key ? "active" : ""} href={`/search?project=${project.key}`}>Issues</Link></div>
         </section>
 
         {view === "board" && <><section className="board-toolbar">
